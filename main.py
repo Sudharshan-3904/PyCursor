@@ -152,7 +152,7 @@ class PyCursorMain(QMainWindow):
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:
-                editor.setPlainText(f.read())
+                editor.setText(f.read())
         except Exception as e:
             self.terminal.log(f"Failed to open {file_path}: {e}")
             return

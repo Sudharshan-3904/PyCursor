@@ -3,3 +3,4 @@ pygments
 gitpython
 openai
 PySide6
+pyqt6-qscintilla

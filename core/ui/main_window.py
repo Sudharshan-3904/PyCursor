@@ -52,7 +52,7 @@ class MainWindow(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Python Files (*.py);;All Files (*)")
         if file_path:
             with open(file_path, "r", encoding="utf-8") as f:
-                self.editor.setPlainText(f.read())
+                self.editor.setText(f.read())
 
     def save_file(self):
         file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Python Files (*.py);;All Files (*)")
