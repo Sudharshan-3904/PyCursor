@@ -30,9 +30,10 @@ class CodeEditor(QsciScintilla):
         self.setMarginWidth(1, 12)
         self.setMarginSensitivity(1, True)
 
-        # IMPORTANT: Disable built-in folding style to avoid conflicts
         self.setFolding(QsciScintilla.FoldStyle.PlainFoldStyle)
         self.setFoldMarginColors(background_color, background_color)
+
+        self.setBraceMatching(QsciScintilla.BraceMatch.SloppyBraceMatch)
 
         self.markerDeleteAll()
 
