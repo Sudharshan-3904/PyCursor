@@ -1,4 +1,4 @@
-from PyQt6.QtGui import QFont, QColor, QPixmap, QPainter, QPolygon, QKeyEvent
+from PyQt6.QtGui import QFont, QColor, QPixmap, QPainter, QPolygon
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython, QsciLexerCPP
 from PyQt6.QtCore import QPoint
 import ast

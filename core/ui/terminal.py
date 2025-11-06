@@ -2,12 +2,12 @@ import os
 import sys
 import platform
 from PyQt6.QtCore import QProcess, Qt
-from PyQt6.QtWidgets import QTextEdit, QApplication
+from PyQt6.QtWidgets import QTextEdit
 from PyQt6.QtGui import QTextCursor
 
-
+# TODO - Make terminal resizeable
 class Terminal(QTextEdit):
-    def __init__(self):
+    def __init__(self, project_path=None):
         super().__init__()
         self.setReadOnly(False)
         self.setAcceptRichText(False)
@@ -23,25 +23,33 @@ class Terminal(QTextEdit):
         self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.setUndoRedoEnabled(False)
 
+        self.project_path = project_path or os.getcwd()
         self.shell = self._detect_shell()
         self.process = QProcess(self)
-        self._init_process()
-
-        self.prompt = f"{os.getcwd()} $ " if os.name != "nt" else f"{os.getcwd()}> "
-        self.append(self.prompt)
-        self.cursor = self.textCursor()
-
-    # ─────────────────────────────────────────────
-    # Initialize QProcess for the shell
-    def _init_process(self):
-        """Start shell process and connect signals."""
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_output)
         self.process.readyReadStandardError.connect(self._on_output)
-        self.process.start(self.shell)
 
+        # Prepare environment variables
+        env = os.environ.copy()
+        activate_cmd = self._get_env_activation_path()
+        if activate_cmd and os.path.exists(activate_cmd):
+            if platform.system() != "Windows":
+                # Prepend venv/bin to PATH
+                env["PATH"] = os.path.join(activate_cmd, "..") + os.pathsep + env["PATH"]
+            else:
+                env["PATH"] = os.path.join(activate_cmd, "..") + os.pathsep + env["PATH"]
+
+        self.process.setProcessEnvironment(env)
+
+        # Start shell
+        self.process.start(self.shell)
+        self.prompt = f"{os.getcwd()} $ " if os.name != "nt" else f"{os.getcwd()}> "
+        self.append(self.prompt)
+
+    # ─────────────────────────────────────────────
     def _detect_shell(self):
-        """Detects system shell (bash/zsh/cmd/powershell)."""
+        """Detect system shell (bash/zsh/cmd/powershell)."""
         if platform.system() == "Windows":
             return os.environ.get("COMSPEC", "cmd.exe")
         elif platform.system() == "Darwin":
@@ -50,42 +58,44 @@ class Terminal(QTextEdit):
             return os.environ.get("SHELL", "/bin/bash")
 
     # ─────────────────────────────────────────────
-    # Output handling
+    def _get_env_activation_path(self):
+        """Return path to venv's activate script."""
+        venv_path = os.path.join(self.project_path, "venv")
+        if os.path.exists(venv_path):
+            if platform.system() == "Windows":
+                return os.path.join(venv_path, "Scripts", "python.exe")
+            else:
+                return os.path.join(venv_path, "bin", "python")
+        return None
+
+    # ─────────────────────────────────────────────
     def _on_output(self):
-        """Read output from shell and append to terminal."""
+        """Append output from shell."""
         data = self.process.readAllStandardOutput().data().decode("utf-8", errors="ignore")
         if data:
             self.moveCursor(QTextCursor.MoveOperation.End)
             self.insertPlainText(data)
             self.ensureCursorVisible()
 
+    # ─────────────────────────────────────────────
     def keyPressEvent(self, event):
-        """Handle user key presses."""
-        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            cursor = self.textCursor()
-            cursor.movePosition(QTextCursor.MoveOperation.End)
-            self.setTextCursor(cursor)
+        """Send input to shell."""
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.setTextCursor(cursor)
 
-            text = self.toPlainText().split("\n")[-1].replace(self.prompt, "").strip()
-            if text:
-                self.process.write((text + "\n").encode("utf-8"))
-            self.append("")  # new line after command
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            # Get last line
+            text = self.toPlainText().split("\n")[-1].replace(self.prompt, "")
+            if text.strip():
+                self.process.write((text.strip() + "\n").encode("utf-8"))
+            self.append("")  # new line
             return
 
+        # Prevent deleting the prompt
+        elif event.key() == Qt.Key.Key_Backspace:
+            line = self.toPlainText().split("\n")[-1]
+            if len(line) <= len(self.prompt):
+                return
 
-        # ─────────────────────────────────────────────
-        # Helper: reset prompt after each command
-        def append_prompt(self):
-            """Append the shell prompt after output."""
-            self.append(self.prompt)
-            self.moveCursor(QTextCursor.End)
-            self.ensureCursorVisible()
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    terminal = Terminal()
-    terminal.setFixedHeight(250)
-    terminal.show()
-    sys.exit(app.exec())
-
+        super().keyPressEvent(event)
