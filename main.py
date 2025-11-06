@@ -178,7 +178,6 @@ class PyCursorMain(QMainWindow):
             """
         )
         close_btn.clicked.connect(lambda _, i=index: self.tab_widget.removeTab(i))
-        # self.tab_widget.setTabButton(index, QTabWidget.TabPosition.RightSide, close_btn)
         self.tab_widget.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, close_btn)
 
         self.terminal.log(f"Opened {file_path}")
