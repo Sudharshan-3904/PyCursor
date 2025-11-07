@@ -2,7 +2,7 @@ import os
 import sys
 import platform
 from PyQt6.QtCore import QProcess, Qt
-from PyQt6.QtWidgets import QTextEdit
+from PyQt6.QtWidgets import QTextEditb
 from PyQt6.QtGui import QTextCursor
 
 # TODO - Make terminal resizeable

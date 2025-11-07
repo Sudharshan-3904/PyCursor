@@ -5,3 +5,4 @@ openai
 PySide6
 pyqt6-qscintilla
 pyqt6-webengine
+watchdog
