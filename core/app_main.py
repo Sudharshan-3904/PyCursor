@@ -1,66 +1,19 @@
+# app_main.py
 import sys
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QSplitter, QWidget,
-    QVBoxLayout, QFileDialog, QTabWidget, QPushButton, QTabBar
-)
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QAction,  QIcon, QPixmap, QPainter
 import os
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QDockWidget, QTabWidget,
+    QWidget, QVBoxLayout, QPushButton, QFileDialog
+)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 
+from core.utils import load_icon
 from core.ui.sidebar import SideBar
 from core.ui.editor import CodeEditor
 from core.ui.terminal import Terminal
-from core.ai.ai_engine import AIEngine
+from core.ai.ai_engine import AIAssistantWidget  # AI widget
 
-
-def load_icon(name: str, size=20, recolor_to_white=True) -> QIcon:
-    base_dir = os.path.join(os.path.dirname(__file__), "assets", "icons")
-    icon_path = os.path.abspath(os.path.join(base_dir, name))
-    if not os.path.exists(icon_path):
-        print(f"[Icon Warning] Missing icon file: {icon_path}")
-        return QIcon()
-
-    pixmap = QPixmap(icon_path).scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-
-    if recolor_to_white:
-        white_pixmap = QPixmap(pixmap.size())
-        white_pixmap.fill(Qt.GlobalColor.transparent)
-
-        painter = QPainter(white_pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-        painter.fillRect(white_pixmap.rect(), Qt.GlobalColor.white)
-        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
-        painter.drawPixmap(0, 0, pixmap)
-        painter.end()
-        return QIcon(white_pixmap)
-
-    return QIcon(pixmap)
-
-
-def set_custom_tab_close_icons(tab_widget: QTabWidget, icon_name: str, size=16):
-    """Set a custom close icon for all tabs in a QTabWidget."""
-    tab_widget.setTabsClosable(True)
-    close_icon = load_icon(icon_name, size=size)
-
-    for i in range(tab_widget.count()):
-        # Create a QPushButton for the close button
-        close_btn = QPushButton()
-        close_btn.setIcon(close_icon)
-        close_btn.setIconSize(QSize(size, size))
-        close_btn.setFixedSize(size + 4, size + 4)  # Add a little padding
-        close_btn.setStyleSheet(
-            """
-            QPushButton {
-                border: none;
-                background: transparent;
-            }
-            QPushButton:hover {
-                background-color: #ff5555;
-            }
-            """
-        )
-        close_btn.clicked.connect(lambda _, index=i: tab_widget.removeTab(index))
-        tab_widget.setTabButton(i, QTabWidget.TabPosition.RightSide, close_btn)
 
 
 class PyCursorMain(QMainWindow):
@@ -69,31 +22,50 @@ class PyCursorMain(QMainWindow):
         self.setWindowTitle("PyCursor IDE")
         self.resize(1200, 800)
 
-        # --- Core Widgets ---
-        self.sidebar = SideBar()  # project file tree
-        self.terminal = Terminal()  # logging / console
-        self.tab_widget = QTabWidget()  # multi-tab editor
-        self.tab_widget.setTabsClosable(True)
-        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        # --- Center Editor Tabs ---
+        self.editor_tabs = QTabWidget()
+        self.editor_tabs.setTabsClosable(True)
+        self.editor_tabs.tabCloseRequested.connect(self.close_editor_tab)
+        self.setCentralWidget(self.editor_tabs)
 
-        # Connect sidebar click signal
+        # --- Left Dock: Explorer ---
+        self.sidebar = SideBar()
         self.sidebar.file_selected.connect(self.open_file_in_tab)
 
-        # --- Layout ---
-        h_splitter = QSplitter(Qt.Orientation.Horizontal)
-        h_splitter.addWidget(self.sidebar)
-        h_splitter.addWidget(self.tab_widget)
-        h_splitter.setStretchFactor(0, 1)
-        h_splitter.setStretchFactor(1, 150)
+        self.sidebar_dock = QDockWidget("Explorer", self)
+        self.sidebar_dock.setWidget(self.sidebar)
+        self.sidebar_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea)
+        self.sidebar_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetMovable |
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+        )
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.sidebar_dock)
 
-        v_splitter = QSplitter(Qt.Orientation.Vertical)
-        v_splitter.addWidget(h_splitter)
-        v_splitter.addWidget(self.terminal)
-        v_splitter.setStretchFactor(0, 4)
-        v_splitter.setStretchFactor(1, 2)
+        # --- Right Dock: AI Assistant ---
+        self.ai_widget = AIAssistantWidget()
+        self.ai_dock = QDockWidget("AI Assistant", self)
+        self.ai_dock.setWidget(self.ai_widget)
+        self.ai_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea)
+        self.ai_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetMovable |
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+        )
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_dock)
 
-        self.setCentralWidget(v_splitter)
+        # --- Bottom Dock: Terminal Tabs ---
+        self.terminal_tabs = QTabWidget()
+        self.add_terminal_tab("Terminal 1")  # Start with one terminal
 
+        self.terminal_dock = QDockWidget("Terminal", self)
+        self.terminal_dock.setWidget(self.terminal_tabs)
+        self.terminal_dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea)
+        self.terminal_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetMovable |
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+        )
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal_dock)
+
+        # --- Menu Bar ---
         self.create_menu_bar()
 
     # --- Menu Bar ---
@@ -109,87 +81,65 @@ class PyCursorMain(QMainWindow):
         file_menu.addAction(open_action)
         file_menu.addAction(save_action)
 
-    # --- File Dialog Open ---
+    # --- Open File Dialog ---
     def open_file_dialog(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*.*)")
         if file_path:
             self.open_file_in_tab(file_path)
 
-    # --- Save Current Tab ---
+    # --- Save File ---
     def save_file(self):
-        editor = self.tab_widget.currentWidget()
+        editor = self.editor_tabs.currentWidget()
         if editor:
-            if hasattr(editor, "file_path") and editor.file_path:
-                # Save to existing path
+            file_path = getattr(editor, "file_path", None)
+            if file_path:
                 try:
-                    with open(editor.file_path, "w", encoding="utf-8") as f:
+                    with open(file_path, "w", encoding="utf-8") as f:
                         f.write(editor.toPlainText())
-                    self.terminal.log(f"Saved {editor.file_path}")
                 except Exception as e:
-                    self.terminal.log(f"Failed to save {editor.file_path}: {e}")
+                    print(f"Failed to save {file_path}: {e}")
             else:
-                # Save as new file
                 file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*.*)")
                 if file_path:
                     try:
                         with open(file_path, "w", encoding="utf-8") as f:
                             f.write(editor.toPlainText())
                         editor.file_path = file_path
-                        self.tab_widget.setTabText(self.tab_widget.currentIndex(), file_path.split("/")[-1])
-                        self.terminal.log(f"Saved {file_path}")
+                        self.editor_tabs.setTabText(self.editor_tabs.currentIndex(), os.path.basename(file_path))
                     except Exception as e:
-                        self.terminal.log(f"Failed to save {file_path}: {e}")
+                        print(f"Failed to save {file_path}: {e}")
 
-    # --- Open file in tab ---
+    # --- Open file in editor tab ---
     def open_file_in_tab(self, file_path: str):
-        """Open a file in a new tab or switch if already open."""
-        for i in range(self.tab_widget.count()):
-            editor = self.tab_widget.widget(i)
+        # Check if already open
+        for i in range(self.editor_tabs.count()):
+            editor = self.editor_tabs.widget(i)
             if getattr(editor, "file_path", None) == file_path:
-                self.tab_widget.setCurrentIndex(i)
+                self.editor_tabs.setCurrentIndex(i)
                 return
 
         editor = CodeEditor()
         editor.file_path = file_path
-
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 editor.setText(f.read())
         except Exception as e:
-            self.terminal.log(f"Failed to open {file_path}: {e}")
+            print(f"Failed to open {file_path}: {e}")
             return
 
-        file_name = file_path.split("/")[-1]
-        index = self.tab_widget.addTab(editor, file_name)
-        self.tab_widget.setCurrentIndex(index)
+        self.editor_tabs.addTab(editor, os.path.basename(file_path))
+        self.editor_tabs.setCurrentWidget(editor)
 
-        close_icon = load_icon("close.png", size=16)
-        close_btn = QPushButton()
-        close_btn.setIcon(close_icon)
-        close_btn.setIconSize(QSize(16,16))
-        close_btn.setFixedSize(20,20)
-        close_btn.setStyleSheet(
-            """
-            QPushButton {
-                border: none;
-                background: transparent;
-            }
-            QPushButton:hover {
-                background-color: #ff5555;
-            }
-            """
-        )
-        close_btn.clicked.connect(lambda _, i=index: self.tab_widget.removeTab(i))
-        self.tab_widget.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, close_btn)
+    # --- Close editor tab ---
+    def close_editor_tab(self, index):
+        widget = self.editor_tabs.widget(index)
+        self.editor_tabs.removeTab(index)
+        widget.deleteLater()
 
-        self.terminal.log(f"Opened {file_path}")
-
-
-    # --- Close tab ---
-    def close_tab(self, index: int):
-        editor = self.tab_widget.widget(index)
-        self.tab_widget.removeTab(index)
-        editor.deleteLater()
+    # --- Add terminal tab ---
+    def add_terminal_tab(self, name="Terminal"):
+        term = Terminal()
+        self.terminal_tabs.addTab(term, name)
 
 
 if __name__ == "__main__":
