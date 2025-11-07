@@ -1,8 +1,8 @@
 import os
 import sys
 import platform
-from PyQt6.QtCore import QProcess, Qt
-from PyQt6.QtWidgets import QTextEditb
+from PyQt6.QtCore import QProcess, QProcessEnvironment, Qt
+from PyQt6.QtWidgets import QTextEdit, QSizePolicy
 from PyQt6.QtGui import QTextCursor
 
 # TODO - Make terminal resizeable
@@ -20,6 +20,8 @@ class Terminal(QTextEdit):
                 padding: 5px;
             }
         """)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setMinimumHeight(100)
         self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.setUndoRedoEnabled(False)
 
@@ -31,14 +33,17 @@ class Terminal(QTextEdit):
         self.process.readyReadStandardError.connect(self._on_output)
 
         # Prepare environment variables
-        env = os.environ.copy()
+        env = QProcessEnvironment.systemEnvironment()
+
+        # Copy current environment variables
+        for key, value in os.environ.items():
+            env.insert(str(key), str(value))
+
         activate_cmd = self._get_env_activation_path()
         if activate_cmd and os.path.exists(activate_cmd):
-            if platform.system() != "Windows":
-                # Prepend venv/bin to PATH
-                env["PATH"] = os.path.join(activate_cmd, "..") + os.pathsep + env["PATH"]
-            else:
-                env["PATH"] = os.path.join(activate_cmd, "..") + os.pathsep + env["PATH"]
+            venv_dir = os.path.join(activate_cmd, "..")
+            path = env.value("PATH") or ""
+            env.insert("PATH", venv_dir + os.pathsep + path)
 
         self.process.setProcessEnvironment(env)
 
@@ -99,3 +104,9 @@ class Terminal(QTextEdit):
                 return
 
         super().keyPressEvent(event)
+    
+    def log(self, msgStr: str = ""):
+        """Log a Message to the shell"""
+        self.append("-"*75)
+        self.append(f"[Log] ::: {msgStr}")
+        self.append("-"*75)
