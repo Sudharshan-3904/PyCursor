@@ -8,36 +8,46 @@ class LocalModelHandler:
         self.model_name = model_name
         self.lmstudio_url = lmstudio_url
         self.ollama_url = ollama_url
+        self.system_prompt = {"role": "system", "content": "You are a coding assistant. Your job is to assist the user with any technical questions they may have. Explain everything using simple anaogies if asked for explanation. Write code with whatever comments are required. You are write code in python unless mentioned otherwise by the user. The output should be in a structured markdown format."}
 
     def chunk_text(self, text, chunk_size=512):
         return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
     def query_lmstudio(self, prompt):
         payload = {
-            "prompt": prompt,
+            "messages": [
+                self.system_prompt,
+                {"role": "user", "content": prompt}
+            ],
             "model": self.model_name or "default"
         }
         try:
-            response = requests.post(f"{self.lmstudio_url}/v1/completions", json=payload)
+            response = requests.post(f"{self.lmstudio_url}/v1/chat/completions", json=payload)
             response.raise_for_status()
             json_resp = response.json()
-            # Debug print to verify response format
-            print("LM Studio completion response:", json_resp)
-            # Extract text from choices
-            return json_resp.get("choices", [{}])[0].get("text", "")
+            # print("LM Studio completion response:", json_resp)
+            return json_resp["choices"][0]["message"]["content"]
         except Exception as e:
             return f"[Error querying LM Studio: {e}]"
 
     def query_ollama(self, prompt):
         payload = {
             "model": self.model_name or "granite3.1-moe:latest",
-            "prompt": prompt,
-            "max_tokens": 500
+            "messages": [
+                self.system_prompt,
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 500,
+            "stream": False
         }
         try:
             response = requests.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
-            return response.json().get("message", "")
+            data = response.json()
+            
+            # print("Data from Ollama: ", data, "\t\t            <- End")
+            message = data.get("message", {})
+            return message.get("content", "")
         except Exception as e:
             return f"[Error querying Ollama: {e}]"
 
