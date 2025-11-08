@@ -25,7 +25,7 @@ class LocalModelHandler:
             response = requests.post(f"{self.lmstudio_url}/v1/chat/completions", json=payload)
             response.raise_for_status()
             json_resp = response.json()
-            # print("LM Studio completion response:", json_resp)
+            # print("Data from LM Studio:", json_resp, "\t\t            <- End")
             return json_resp["choices"][0]["message"]["content"]
         except Exception as e:
             return f"[Error querying LM Studio: {e}]"
@@ -79,30 +79,25 @@ class LocalModelHandler:
     def detect_models(self):
         models = {}
 
-        # LM Studio detection
         try:
             response = requests.get(f"{self.lmstudio_url}/v1/models", timeout=2)
             if response.status_code == 200:
                 data = response.json()
-                # The actual models list is inside data['data']
                 for model in data.get("data", []):
                     model_name = model.get("id", str(model))
                     models[f"LM Studio: {model_name}"] = model_name
         except Exception as e:
             print("LM Studio API detection failed:", e)
 
-        # Ollama detection
         try:
             result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
             lines = result.stdout.splitlines()
 
-            # Skip header if it exists (check if first line contains 'NAME')
             if lines and "NAME" in lines[0]:
                 lines = lines[1:]
 
             for line in lines:
                 if line.strip():
-                    # Extract the first column (model name) by splitting whitespace
                     model_name = line.split()[0]
                     models[f"Ollama: {model_name}"] = model_name
         except Exception as e:

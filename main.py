@@ -7,21 +7,17 @@ from watchdog.events import FileSystemEventHandler
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 
-# Import your main app
 from core import app_main
 
-# Import components to patch
 from core.ui.editor import CodeEditor
 from core.ui.terminal import Terminal
 from core.ui.sidebar import SideBar
 
 
-# ─────────────────────────────────────────────
 class ReloadSignals(QObject):
-    reload_triggered = pyqtSignal(object)  # signal accepts reload function
+    reload_triggered = pyqtSignal(object)
 
 
-# ─────────────────────────────────────────────
 class ReloadHandler(FileSystemEventHandler):
     """Watchdog handler to detect file changes."""
 
@@ -33,12 +29,11 @@ class ReloadHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith(".py"):
             current_time = time.time()
-            if current_time - self.last_reload > 1:  # debounce 1s
+            if current_time - self.last_reload > 1:
                 self.last_reload = current_time
                 self.signals.reload_triggered.emit(event.src_path)
 
 
-# ─────────────────────────────────────────────
 class HotReloader(QObject):
     def __init__(self, app: QApplication):
         super().__init__()
@@ -48,7 +43,6 @@ class HotReloader(QObject):
         self.signals = ReloadSignals()
         self.signals.reload_triggered.connect(self._handle_reload)
 
-        # Map relative paths to reload functions
         self.component_map = {
             "core/ui/editor.py": self._reload_editor,
             "core/ui/terminal.py": self._reload_terminal,
@@ -66,7 +60,6 @@ class HotReloader(QObject):
         self.observer.schedule(event_handler, watch_path, recursive=True)
         self.observer.start()
 
-        # Launch initial GUI
         self._reload_full()
 
     def stop(self):
@@ -85,7 +78,6 @@ class HotReloader(QObject):
                 func()
                 break
         else:
-            # fallback
             self._reload_full()
 
     def _reload_editor(self):
@@ -101,7 +93,6 @@ class HotReloader(QObject):
                         cursor_pos = widget.textCursor().position()
                         file_path = getattr(widget, "file_path", None)
 
-                        # Replace methods by patching class
                         widget.__class__ = editor_module.CodeEditor
                         widget.setPlainText(content)
                         cursor = widget.textCursor()
@@ -121,7 +112,6 @@ class HotReloader(QObject):
 
             if self.window:
                 term = self.window.terminal
-                # Patch methods dynamically to preserve QProcess
                 term.__class__ = terminal_module.Terminal
                 term.keyPressEvent = terminal_module.Terminal.keyPressEvent.__get__(term)
                 term._on_output = terminal_module.Terminal._on_output.__get__(term)
@@ -140,7 +130,6 @@ class HotReloader(QObject):
 
             if self.window:
                 old_sidebar = self.window.sidebar
-                # Patch class dynamically
                 old_sidebar.__class__ = sidebar_module.SideBar
                 old_sidebar.setRootPath(old_sidebar.rootPath())
 
@@ -166,7 +155,6 @@ class HotReloader(QObject):
             print(f"[HotReload] Full reload failed: {e}")
 
 
-# ─────────────────────────────────────────────
 def main():
     app = QApplication(sys.argv)
     reloader = HotReloader(app)

@@ -12,7 +12,6 @@ class LanguageConfig:
         self.indent = indent
         self.use_tabs = use_tabs
 
-# Language configs
 LANGUAGE_CONFIGS = {
     "python": LanguageConfig(
         QsciLexerPython,
@@ -42,7 +41,6 @@ class CodeEditor(QsciScintilla):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # General colors
         self.background_color = QColor("#1E1E1E")
         self.line_number_color = QColor("#858585")
         self.caret_color = QColor("#AEAFAD")
@@ -56,7 +54,6 @@ class CodeEditor(QsciScintilla):
         self.setup_fold_markers()
         self.apply_language_config("python")
 
-        # Syntax error checking
         self.textChanged.connect(self.highlight_syntax_errors)
 
     def setup_ui(self):
@@ -64,28 +61,24 @@ class CodeEditor(QsciScintilla):
         self.setFont(font)
         self.setMarginsFont(font)
 
-        # Line numbers
         self.setMarginsBackgroundColor(self.background_color)
         self.setMarginsForegroundColor(self.line_number_color)
         self.setMarginType(0, QsciScintilla.MarginType.NumberMargin)
         self.setMarginWidth(0, "0000")
         self.setMarginLineNumbers(0, True)
 
-        # Folding margin
         self.setMarginType(1, QsciScintilla.MarginType.SymbolMargin)
         self.setMarginWidth(1, 12)
         self.setMarginSensitivity(1, True)
         self.setFolding(QsciScintilla.FoldStyle.PlainFoldStyle)
         self.setFoldMarginColors(self.background_color, self.background_color)
 
-        # Caret & selection
         self.setCaretForegroundColor(self.caret_color)
         self.setCaretLineVisible(True)
         self.setCaretLineBackgroundColor(self.current_line_color)
         self.setSelectionBackgroundColor(self.selection_color)
         self.setBraceMatching(QsciScintilla.BraceMatch.SloppyBraceMatch)
 
-        # Tabs & indentation
         self.setIndentationWidth(4)
         self.setTabWidth(4)
         self.setIndentationsUseTabs(False)
@@ -124,7 +117,6 @@ class CodeEditor(QsciScintilla):
         lexer.setFoldComments(True)
         lexer.setFoldCompact(True)
 
-        # Map colors
         color_map = {}
         if isinstance(lexer, QsciLexerPython):
             color_map = {
@@ -150,7 +142,6 @@ class CodeEditor(QsciScintilla):
 
         self.setLexer(lexer)
 
-        # Indentation
         self.setIndentationWidth(config.indent)
         self.setTabWidth(config.indent)
         self.setIndentationsUseTabs(config.use_tabs)
@@ -166,17 +157,15 @@ class CodeEditor(QsciScintilla):
             self.markerAdd(e.lineno - 1, 0)
 
     def keyPressEvent(self, event):
-        if event.key() in (0x01000004, 0x01000005):  # Qt.Key_Return, Qt.Key_Enter
+        if event.key() in (0x01000004, 0x01000005):
             line, index = self.getCursorPosition()
             prev_text = self.text(line) if line >= 0 else ""
             stripped_prev = prev_text.rstrip()
             base_indent = len(prev_text) - len(prev_text.lstrip())
 
-            # Decide extra indentation
             extra_indent = self.indentationWidth() if stripped_prev.endswith(self.indentation_chars) else 0
             desired_indent = base_indent + extra_indent
 
-            # Insert newline with correct indentation
             self.insert("\n" + " " * desired_indent)
             self.setCursorPosition(line + 1, desired_indent)
         else:

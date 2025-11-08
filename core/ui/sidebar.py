@@ -11,7 +11,7 @@ from core.utils import load_icon
 
 class SideBar(QWidget):
     file_selected = pyqtSignal(str)
-    model_changed = pyqtSignal(str, str)  # model_name, backend
+    model_changed = pyqtSignal(str, str)
 
     def __init__(self, root_path=None):
         super().__init__()
@@ -20,7 +20,6 @@ class SideBar(QWidget):
         self.creating_item = None
         self.filter_mode = False
 
-        # === Example model storage ===
         self.models = {
             "LM Studio": ["lm1", "lm2"],
             "Ollama": ["granite", "ruby"],
@@ -29,18 +28,15 @@ class SideBar(QWidget):
         self.current_model_name = "lm1"
         self.current_backend = "lmstudio"
 
-        # === Layout ===
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(5, 5, 5, 5)
         main_layout.setSpacing(2)
 
-        # === Header ===
         header = QLabel("EXPLORER")
         header.setStyleSheet("color: #cccccc; font-weight: bold; font-size: 12px; padding-left: 8px;")
         header.setFixedHeight(20)
         main_layout.addWidget(header)
 
-        # === Toolbar ===
         toolbar = QWidget()
         toolbar_layout = QHBoxLayout()
         toolbar_layout.setContentsMargins(8, 0, 8, 0)
@@ -51,7 +47,6 @@ class SideBar(QWidget):
         dir_label.setStyleSheet("color: #dddddd; font-size: 11px; font-weight: bold;")
         dir_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
-        # Refresh button
         refresh_btn = QPushButton()
         refresh_btn.setIcon(load_icon("refresh.png"))
         refresh_btn.setToolTip("Refresh Tree")
@@ -59,7 +54,6 @@ class SideBar(QWidget):
         refresh_btn.setStyleSheet("border: none;")
         refresh_btn.clicked.connect(self.refresh_tree)
 
-        # New file button
         new_file_btn = QPushButton()
         new_file_btn.setIcon(load_icon("new_file.png"))
         new_file_btn.setToolTip("New File")
@@ -67,7 +61,6 @@ class SideBar(QWidget):
         new_file_btn.setStyleSheet("border: none;")
         new_file_btn.clicked.connect(lambda: self.create_item(is_folder=False))
 
-        # New folder button
         new_folder_btn = QPushButton()
         new_folder_btn.setIcon(load_icon("new_folder.png"))
         new_folder_btn.setToolTip("New Folder")
@@ -75,7 +68,6 @@ class SideBar(QWidget):
         new_folder_btn.setStyleSheet("border: none;")
         new_folder_btn.clicked.connect(lambda: self.create_item(is_folder=True))
 
-        # Filter button
         self.filter_btn = QPushButton()
         self.filter_btn.setIcon(load_icon("filter.png"))
         self.filter_btn.setToolTip("Filter Files")
@@ -84,21 +76,13 @@ class SideBar(QWidget):
         self.filter_btn.setStyleSheet("border: none;")
         self.filter_btn.clicked.connect(self.toggle_filter)
 
-        # === Model selection button ===
-        self.model_btn = QPushButton("Model")
-        self.model_btn.setToolTip("Select AI Model")
-        self.model_btn.setFixedHeight(22)
-        self.model_btn.clicked.connect(self.show_model_menu)
-
         toolbar_layout.addWidget(dir_label)
         toolbar_layout.addWidget(refresh_btn)
         toolbar_layout.addWidget(new_file_btn)
         toolbar_layout.addWidget(new_folder_btn)
         toolbar_layout.addWidget(self.filter_btn)
-        toolbar_layout.addWidget(self.model_btn)  # add model button
         main_layout.addWidget(toolbar)
 
-        # === Filter Dropdown ===
         self.filter_combo = QComboBox()
         self.filter_combo.addItems([
             "Show All",
@@ -112,7 +96,6 @@ class SideBar(QWidget):
         self.filter_combo.currentIndexChanged.connect(self.apply_filter)
         main_layout.addWidget(self.filter_combo)
 
-        # === File Tree ===
         self.model = QFileSystemModel()
         self.model.setRootPath(self.root_path)
 
@@ -133,11 +116,9 @@ class SideBar(QWidget):
         main_layout.addWidget(self.tree)
         self.setLayout(main_layout)
 
-    # ---------------- MODEL MENU ---------------- #
     def show_model_menu(self):
         menu = QMenu()
 
-        # LM Studio models
         if self.models.get("LM Studio"):
             menu.addSection("LM Studio Models")
             for model in self.models["LM Studio"]:
@@ -146,7 +127,6 @@ class SideBar(QWidget):
                 menu.addAction(action)
             menu.addSeparator()
 
-        # Ollama models
         if self.models.get("Ollama"):
             menu.addSection("Ollama Models")
             for model in self.models["Ollama"]:
@@ -155,7 +135,6 @@ class SideBar(QWidget):
                 menu.addAction(action)
             menu.addSeparator()
 
-        # API models
         if self.models.get("API"):
             menu.addSection("API Models")
             for model in self.models["API"]:
@@ -163,15 +142,11 @@ class SideBar(QWidget):
                 action.triggered.connect(lambda checked, m=model: self.switch_model(m, "api"))
                 menu.addAction(action)
 
-        # Show menu below the button
-        menu.exec(self.model_btn.mapToGlobal(self.model_btn.rect().bottomLeft()))
-
     def switch_model(self, model_name, backend):
         self.current_model_name = model_name
         self.current_backend = backend
         self.model_changed.emit(model_name, backend)
 
-    # === Toolbar actions ===
     def refresh_tree(self):
         root_index = self.model.index(self.root_path)
         self.tree.setRootIndex(self.proxy_model.mapFromSource(root_index))
@@ -201,7 +176,6 @@ class SideBar(QWidget):
             file_path = self.model.filePath(source_index)
             self.file_selected.emit(file_path)
 
-    # === New File / Folder ===
     def create_item(self, is_folder=False):
         if self.creating_item:
             return
@@ -253,7 +227,6 @@ class SideBar(QWidget):
             self.creating_item = None
 
 
-# === Proxy Model for Extension Filtering ===
 class ExtensionFilterProxyModel(QSortFilterProxyModel):
     def __init__(self):
         super().__init__()
@@ -270,7 +243,7 @@ class ExtensionFilterProxyModel(QSortFilterProxyModel):
 
         file_path = self.sourceModel().filePath(index)
         if os.path.isdir(file_path):
-            return True  # always show folders
+            return True
 
         if not self.allowed_extensions:
             return True
