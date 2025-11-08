@@ -7,13 +7,27 @@ It combines the flexibility of a modern code editor with the intelligence of Lar
 
 ## 🚀 Features
 
-### 🖥️ VS Code-Style Layout
+### 🖥️ Core Editor & Layout (✅ Completed)
 
-- Familiar, clean, and modular UI design similar to **Visual Studio Code**.
-- Split panes, sidebar, bottom console, and command palette.
-- Dockable panels for files, terminals, and extensions.
+- Modern PyQt6-based interface with resizable layout using QSplitter
+- File explorer sidebar with project navigation
+- Integrated terminal with logging support
+- Basic file operations (open/save)
+- Code editor with:
+  - Line numbers
+  - Python syntax highlighting
+  - Smart auto-indentation
+  - Multi-tab file management
 
-### 🤖 Extensive LLM Support
+### ⚡ Editor Intelligence (✅ Completed)
+
+- Bracket matching for `()[]{}` pairs
+- Enhanced auto-indentation for Python blocks
+- Code folding for functions and classes
+- Real-time error highlighting and linting
+- Tab-based file management
+
+### 🤖 Extensive LLM Support (⏳ Planned)
 
 - **Dual AI Integration**:
 
@@ -80,7 +94,7 @@ It combines the flexibility of a modern code editor with the intelligence of Lar
 
 ---
 
-## 🏗️ Project Architecture (Planned)
+## 🏗️ Project Architecture (Current)
 
 ```dir
 PyCursor/
@@ -104,7 +118,7 @@ PyCursor/
 ## ⚙️ Tech Stack
 
 - **Language:** Python 3.10+
-- **UI Framework:** PyQt6 / Tkinter / Electron-Python bridge (to be chosen)
+- **UI Framework:** PyQt6
 - **AI Integration:** OpenAI API, Hugging Face, Ollama, or custom REST endpoints
 - **Git Integration:** GitPython
 - **Environment Management:** `venv`, `conda`, or `virtualenv`
@@ -116,12 +130,15 @@ PyCursor/
 
 | Phase | Feature                       | Status         |
 | ----- | ----------------------------- | -------------- |
-| 1     | Core Python IDE + Layout      | 🏗️ In Progress |
-| 2     | LLM Integration (Local + API) | ⏳ Planned     |
-| 3     | Git & GitHub Integration      | ⏳ Planned     |
-| 4     | Environment Management UI     | ⏳ Planned     |
-| 5     | Multi-language Support        | ⏳ Planned     |
-| 6     | Plugin System & Theming       | ⏳ Planned     |
+| 1     | Core Editor & Layout          | ✅ Completed   |
+| 2     | Editor Intelligence & UX      | ✅ Completed   |
+| 3     | LLM & AI Integration          | ⏳ Planned     |
+| 4     | Git & GitHub Integration      | ⏳ Planned     |
+| 5     | Environment Management        | ⏳ Planned     |
+| 6     | Multi-language Support        | ⏳ Planned     |
+| 7     | Plugin System & Theming       | ⏳ Planned     |
+| 8     | Polishing & Deployment        | ⏳ Planned     |
+| 9     | Future Enhancements           | 🌟 Optional    |
 
 ---
 

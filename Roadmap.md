@@ -64,7 +64,7 @@
 
 ---
 
-## **Phase 3: LLM & AI Integration** ⏳ Planned
+## **Phase 3: LLM & AI Integration** 🏗️ In Progress
 
 **Goal:** Make coding faster and smarter using AI.
 
@@ -198,16 +198,16 @@
 
 ## ✅ Summary of Progress
 
-| Phase | Feature                     | Status       |
-| ----- | --------------------------- | ------------ |
-| 1     | Core Editor & Layout        | ✅ Completed |
-| 2     | Editor Intelligence & UX    | ✅ Completed |
-| 3     | LLM Integration             | ⏳ Planned   |
-| 4     | Git & GitHub                | ⏳ Planned   |
-| 5     | Env & Dependency Management | ⏳ Planned   |
-| 6     | Multi-language Support      | ⏳ Planned   |
-| 7     | Plugin System & Theming     | ⏳ Planned   |
-| 8     | Polishing & Deployment      | ⏳ Planned   |
-| 9     | Future Enhancements         | ⏳ Optional  |
+| Phase | Feature                     | Status         |
+| ----- | --------------------------- | -------------- |
+| 1     | Core Editor & Layout        | ✅ Completed   |
+| 2     | Editor Intelligence & UX    | ✅ Completed   |
+| 3     | LLM Integration             | 🏗️ In Progress |
+| 4     | Git & GitHub                | ⏳ Planned     |
+| 5     | Env & Dependency Management | ⏳ Planned     |
+| 6     | Multi-language Support      | ⏳ Planned     |
+| 7     | Plugin System & Theming     | ⏳ Planned     |
+| 8     | Polishing & Deployment      | ⏳ Planned     |
+| 9     | Future Enhancements         | ⏳ Optional    |
 
 ---

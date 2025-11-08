@@ -4,3 +4,7 @@ gitpython
 openai
 PySide6
 pyqt6-qscintilla
+pyqt6-webengine
+watchdog
+langchain_ollama
+langchain_core
