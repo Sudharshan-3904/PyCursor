@@ -1,189 +1,227 @@
-from PyQt6.QtWidgets import QWidget, QTextEdit, QPushButton, QHBoxLayout, QVBoxLayout, QMenu
-from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import QSize, Qt
-from functools import partial
 import os
-import requests
+import sys
+import subprocess
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QMenu,
+    QTextEdit, QPushButton, QLineEdit, QInputDialog, QComboBox
+)
+from PyQt6.QtGui import QAction
 
-from langchain_ollama import ChatOllama
-from core.utils import load_icon
+from ..utils import load_icon
+from .local_model_handler import LocalModelHandler
 
 
 class AIAssistantWidget(QWidget):
-    LOCAL_MODE_ICON = "local.png"
-    API_MODE_ICON = "api.png"
-
-    def __init__(self, local_models_dir=None):
+    def __init__(self):
         super().__init__()
+        self.setWindowTitle("AI Assistant")
+        self.resize(600, 800)
 
-        self.local_models_dir = local_models_dir or os.path.join(os.path.expanduser("~"), "ai_models")
-        self.execution_mode = "API"
+        self.system_prompt = "You are a helpful AI assistant."
+        self.chunk_size = 500  # characters per chunk
 
-        # Detect models upfront (synchronously)
-        self.available_models = self.detect_all_models()
-        self.current_model = self.available_models[0] if self.available_models else "LLaMA-3"
+        # Load icons
+        self.send_icon = load_icon("send.png")
+        self.local_icon = load_icon("local.png")
+        self.api_icon = load_icon("api.png")
+        self.model_icon = load_icon("model.png")
 
-        # --------------------------
-        # Layout
-        # --------------------------
-        self.setLayout(QVBoxLayout())
-        self.layout().setContentsMargins(5, 5, 5, 5)
+        # Model storage
+        self.models = self.detect_local_models()
+        self.current_model_name = next(iter(self.models.keys()), None)
+        self.current_backend = (
+            "lmstudio" if self.current_model_name and self.current_model_name.startswith("LM Studio") else "ollama"
+        )
 
-        # Prompt box
-        self.prompt_box = QTextEdit()
-        self.prompt_box.setPlaceholderText("Type a prompt here and press 'Send'...")
-        self.layout().addWidget(self.prompt_box)
+        # Initialize local model handler
+        self.local_model_handler = LocalModelHandler(
+            backend=self.current_backend,
+            model_name=self.current_model_name.split(": ", 1)[-1] if self.current_model_name else None
+        )
 
-        # Controls
-        controls_layout = QHBoxLayout()
+        self.init_ui()
 
-        # Local/API button
-        self.local_api_btn = QPushButton()
-        self.update_execution_icon()
-        self.local_api_btn.setIconSize(QSize(32, 32))
-        self.local_api_btn.setFixedSize(36, 36)
-        self.local_api_btn.setToolTip(f"Execution Mode: {self.execution_mode}")
-        controls_layout.addWidget(self.local_api_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # Spacer
-        controls_layout.addStretch(1)
+    def init_ui(self):
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setSpacing(5)
+
+        # ---------------- Chat Area ---------------- #
+        self.chat_area = QTextEdit()
+        self.chat_area.setReadOnly(True)
+        self.chat_area.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        main_layout.addWidget(self.chat_area)
+
+        # ---------------- Input Field ---------------- #
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Type your message here...")
+        self.input_field.returnPressed.connect(self.handle_send)
+        main_layout.addWidget(self.input_field)
+
+        # ---------------- Toolbar ---------------- #
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setSpacing(5)
+
+        # API/Local toggle button
+        self.using_api = False  # default to local
+        self.api_local_btn = QPushButton()
+        self.api_local_btn.setIcon(self.local_icon)
+        self.api_local_btn.setCheckable(True)
+        self.api_local_btn.setFixedHeight(28)
+        self.api_local_btn.clicked.connect(self.toggle_api_local)
+        toolbar_layout.addWidget(self.api_local_btn)
+
+        # Model selection button
+        self.model_btn = QPushButton()
+        self.model_btn.setIcon(self.model_icon)
+        self.model_btn.setFixedHeight(28)
+        self.model_btn.setToolTip("Select AI Model")
+
+        # Create a QMenu for the button
+        self.model_menu = QMenu(self)
+        self.populate_model_menu()
+        self.model_btn.setMenu(self.model_menu)
+
+        toolbar_layout.addWidget(self.model_btn)
+
+        # Stretch / free space
+        toolbar_layout.addStretch()
 
         # Send button
-        self.send_btn = QPushButton("Send")
-        self.send_btn.setFixedHeight(32)
-        controls_layout.addWidget(self.send_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.send_btn = QPushButton()
+        self.send_btn.setIcon(self.send_icon)
+        self.send_btn.setFixedHeight(28)
+        self.send_btn.setToolTip("Send message")
+        self.send_btn.clicked.connect(self.handle_send)
+        toolbar_layout.addWidget(self.send_btn)
 
-        # Spacer
-        controls_layout.addStretch(1)
+        main_layout.addLayout(toolbar_layout)
+        self.setLayout(main_layout)
 
-        # Model button
-        self.model_btn = QPushButton()
-        self.model_btn.setIcon(load_icon("model.png", recolor_to_white=True))
-        self.model_btn.setIconSize(QSize(32, 32))
-        self.model_btn.setFixedSize(36, 36)
-        self.model_btn.setToolTip(f"Model: {self.current_model}")
-        controls_layout.addWidget(self.model_btn, alignment=Qt.AlignmentFlag.AlignRight)
+    # ---------------- MODEL MENU ---------------- #
+    def populate_model_menu(self):
+        self.model_menu.clear()
 
-        self.layout().addLayout(controls_layout)
+        # LM Studio models
+        lm_studio_models = [name for name in self.models if name.startswith("LM Studio")]
+        if lm_studio_models:
+            for model in lm_studio_models:
+                action = QAction(model.split(": ", 1)[-1], self)
+                # capture the full model name in lambda default argument
+                action.triggered.connect(lambda checked=False, m=model: self.on_model_change(m))
+                self.model_menu.addAction(action)
+            self.model_menu.addSeparator()
 
-        # --------------------------
-        # Signals
-        # --------------------------
-        self.send_btn.clicked.connect(self.send_prompt)
-        self.local_api_btn.clicked.connect(self.toggle_execution_mode)
-        self.model_btn.clicked.connect(self.show_model_menu)
+        # Ollama models
+        ollama_models = [name for name in self.models if name.startswith("Ollama")]
+        if ollama_models:
+            for model in ollama_models:
+                action = QAction(model.split(": ", 1)[-1], self)
+                action.triggered.connect(lambda checked=False, m=model: self.on_model_change(m))
+                self.model_menu.addAction(action)
+            self.model_menu.addSeparator()
 
-    # --------------------------
-    # Execution mode
-    # --------------------------
-    def update_execution_icon(self):
-        icon_file = self.LOCAL_MODE_ICON if self.execution_mode == "Local" else self.API_MODE_ICON
-        self.local_api_btn.setIcon(load_icon(icon_file))
-        self.local_api_btn.setToolTip(f"Execution Mode: {self.execution_mode}")
+        # API models (static example)
+        api_models = ["chat gpt go"]
+        for model in api_models:
+            action = QAction(model, self)
+            action.triggered.connect(lambda checked=False, m=model: self.on_model_change(m))
+            self.model_menu.addAction(action)
 
-    def toggle_execution_mode(self):
-        self.execution_mode = "Local" if self.execution_mode == "API" else "API"
-        self.update_execution_icon()
-        print(f"[AI] Execution mode switched to {self.execution_mode}")
+    # ---------------- MODEL CHANGE HANDLER ---------------- #
+    def on_model_change(self, selected_model):
+        if selected_model:
+            self.current_model_name = selected_model
+            self.current_backend = "lmstudio" if selected_model.startswith("LM Studio") else "ollama"
+            self.local_model_handler = LocalModelHandler(
+                backend=self.current_backend,
+                model_name=selected_model.split(": ", 1)[-1]
+            )
+            self.chat_area.append(f"<i>[Model switched to: {self.current_model_name}]</i>")
 
-    # --------------------------
-    # Model detection
-    # --------------------------
-    def detect_ollama_models(self):
-        try:
-            r = requests.get("http://localhost:11434/api/tags", timeout=2)
-            r.raise_for_status()
-            return [m["name"] for m in r.json().get("models", [])]
-        except Exception:
-            return []
-
-    def detect_lm_studio_models(self):
-        try:
-            r = requests.get("http://localhost:1234/v1/models", timeout=2)
-            r.raise_for_status()
-            return [m["id"] for m in r.json().get("data", [])]
-        except Exception:
-            return []
-
-    def detect_local_models(self):
-        models = []
-        if os.path.exists(self.local_models_dir):
-            for folder in os.listdir(self.local_models_dir):
-                folder_path = os.path.join(self.local_models_dir, folder)
-                if os.path.isdir(folder_path):
-                    models.append(folder)
-        return models or ["LLaMA-3", "Mistral"]
-
-    def detect_all_models(self):
-        """Return combined list of all available models."""
-        return self.detect_ollama_models() + self.detect_lm_studio_models() + self.detect_local_models()
-
-    # --------------------------
-    # Model menu
-    # --------------------------
-    def show_model_menu(self):
-        menu = QMenu(self)
-
-        sections = [
-            ("Ollama", self.detect_ollama_models()),
-            ("LM Studio", self.detect_lm_studio_models()),
-            ("Local/Fallback", self.detect_local_models())
-        ]
-
-        first_section = True
-        for title, models in sections:
-            if not models:
-                continue
-            if not first_section:
-                menu.addSeparator()
-            first_section = False
-
-            for model in models:
-                action = menu.addAction(model)
-                action.triggered.connect(partial(self.set_model, model))
-                if model == self.current_model:
-                    action.setCheckable(True)
-                    action.setChecked(True)
-
-        menu.popup(self.model_btn.mapToGlobal(self.model_btn.rect().bottomLeft()))
-
-    def set_model(self, model_name):
-        self.current_model = model_name
-        self.model_btn.setToolTip(f"Model: {self.current_model}")
-        print(f"[AI] Model changed to {self.current_model}")
-
-    # --------------------------
-    # AI engine
-    # --------------------------
-    def ai_engine(self, prompt: str) -> str:
-        if self.execution_mode == "API":
-            return f"[API response] Prompt: {prompt}"
-
-        response_text = ""
-        if self.current_model in self.detect_ollama_models():
-            try:
-                client = ChatOllama(model=self.current_model)
-                response_text = client.predict(prompt)
-            except Exception as e:
-                response_text = f"[Ollama error] {e}"
-        elif self.current_model in self.detect_lm_studio_models():
-            try:
-                url = "http://localhost:1234/v1/completions"
-                payload = {"model": self.current_model, "prompt": prompt, "max_tokens": 256}
-                r = requests.post(url, json=payload)
-                r.raise_for_status()
-                response_text = r.json()["choices"][0]["text"]
-            except Exception as e:
-                response_text = f"[LM Studio error] {e}"
-        else:
-            response_text = f"[Local model '{self.current_model}' not found]"
-
-        return response_text
-
-    def send_prompt(self):
-        prompt = self.prompt_box.toPlainText().strip()
-        if not prompt:
+    # ---------------- MODEL SELECTION ---------------- #
+    def choose_model(self):
+        model_names = list(self.models.keys())
+        if not model_names:
             return
-        print(f"[AI] Sending prompt using {self.execution_mode}, model {self.current_model}: {prompt}")
-        response = self.ai_engine(prompt)
-        print(f"[AI] Response: {response}")
+
+        item, ok = QInputDialog.getItem(
+            self,
+            "Select Model",
+            "Choose a model to use:",
+            model_names,
+            current=0,
+            editable=False
+        )
+        if ok and item:
+            self.current_model_name = item
+            self.current_backend = "lmstudio" if item.startswith("LM Studio") else "ollama"
+            # Update the handler
+            self.local_model_handler = LocalModelHandler(
+                backend=self.current_backend,
+                model_name=item.split(": ", 1)[-1]
+            )
+            self.chat_area.append(f"<i>[Model switched to: {self.current_model_name}]</i>")
+
+    # Toggle method
+    def toggle_api_local(self):
+        self.using_api = self.api_local_btn.isChecked()
+        if self.using_api:
+            self.api_local_btn.setIcon(self.api_icon)
+            self.api_local_btn.setToolTip("Using API models")
+        else:
+            self.api_local_btn.setIcon(self.local_icon)
+            self.api_local_btn.setToolTip("Using Local models")
+
+    # ---------------- MODEL DETECTION ---------------- #
+    def detect_local_models(self):
+        models = {}
+
+        # LM Studio
+        lm_studio_path = os.path.expanduser("~/.lmstudio/models")
+        if os.path.exists(lm_studio_path):
+            for model in os.listdir(lm_studio_path):
+                models[f"LM Studio: {model}"] = os.path.join(lm_studio_path, model)
+
+        # Ollama
+        try:
+            result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    models[f"Ollama: {line.strip()}"] = line.strip()
+        except Exception as e:
+            print("Ollama detection failed:", e)
+
+        return models
+
+    # ---------------- SEND HANDLER ---------------- #
+    def handle_send(self):
+        user_input = self.input_field.text().strip()
+        if not user_input:
+            return
+
+        self.chat_area.append(f"<b>User:</b> {user_input}")
+        self.input_field.clear()
+
+        # In handle_send():
+        if self.using_api:
+            # API placeholder
+            model_identifier = next(iter(self.models.values()), "default")
+            response = self.api_model_response(user_input, model_identifier)
+        else:
+            # Local model
+            response = self.local_model_handler.local_model_response(user_input)
+
+        self.chat_area.append(f"<b>AI:</b> {response}\n")
+        self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
+
+    def api_model_response(self, prompt, model_identifier):
+        return f"[API response from {model_identifier}]"
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    widget = AIAssistantWidget()
+    widget.show()
+    sys.exit(app.exec())

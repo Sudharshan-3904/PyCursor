@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QTreeView,
-    QHBoxLayout, QPushButton, QComboBox, QSizePolicy, QLineEdit
+    QHBoxLayout, QPushButton, QComboBox, QSizePolicy, QLineEdit, QMenu
 )
-from PyQt6.QtGui import QFileSystemModel
+from PyQt6.QtGui import QFileSystemModel, QAction
 from PyQt6.QtCore import pyqtSignal, QModelIndex, QSortFilterProxyModel
 
 import os
@@ -11,6 +11,7 @@ from core.utils import load_icon
 
 class SideBar(QWidget):
     file_selected = pyqtSignal(str)
+    model_changed = pyqtSignal(str, str)  # model_name, backend
 
     def __init__(self, root_path=None):
         super().__init__()
@@ -18,6 +19,15 @@ class SideBar(QWidget):
         self.root_path = root_path or os.getcwd()
         self.creating_item = None
         self.filter_mode = False
+
+        # === Example model storage ===
+        self.models = {
+            "LM Studio": ["lm1", "lm2"],
+            "Ollama": ["granite", "ruby"],
+            "API": ["ChatGPT Go"]
+        }
+        self.current_model_name = "lm1"
+        self.current_backend = "lmstudio"
 
         # === Layout ===
         main_layout = QVBoxLayout()
@@ -74,11 +84,18 @@ class SideBar(QWidget):
         self.filter_btn.setStyleSheet("border: none;")
         self.filter_btn.clicked.connect(self.toggle_filter)
 
+        # === Model selection button ===
+        self.model_btn = QPushButton("Model")
+        self.model_btn.setToolTip("Select AI Model")
+        self.model_btn.setFixedHeight(22)
+        self.model_btn.clicked.connect(self.show_model_menu)
+
         toolbar_layout.addWidget(dir_label)
         toolbar_layout.addWidget(refresh_btn)
         toolbar_layout.addWidget(new_file_btn)
         toolbar_layout.addWidget(new_folder_btn)
         toolbar_layout.addWidget(self.filter_btn)
+        toolbar_layout.addWidget(self.model_btn)  # add model button
         main_layout.addWidget(toolbar)
 
         # === Filter Dropdown ===
@@ -115,6 +132,44 @@ class SideBar(QWidget):
 
         main_layout.addWidget(self.tree)
         self.setLayout(main_layout)
+
+    # ---------------- MODEL MENU ---------------- #
+    def show_model_menu(self):
+        menu = QMenu()
+
+        # LM Studio models
+        if self.models.get("LM Studio"):
+            menu.addSection("LM Studio Models")
+            for model in self.models["LM Studio"]:
+                action = QAction(model, self)
+                action.triggered.connect(lambda checked, m=model: self.switch_model(m, "lmstudio"))
+                menu.addAction(action)
+            menu.addSeparator()
+
+        # Ollama models
+        if self.models.get("Ollama"):
+            menu.addSection("Ollama Models")
+            for model in self.models["Ollama"]:
+                action = QAction(model, self)
+                action.triggered.connect(lambda checked, m=model: self.switch_model(m, "ollama"))
+                menu.addAction(action)
+            menu.addSeparator()
+
+        # API models
+        if self.models.get("API"):
+            menu.addSection("API Models")
+            for model in self.models["API"]:
+                action = QAction(model, self)
+                action.triggered.connect(lambda checked, m=model: self.switch_model(m, "api"))
+                menu.addAction(action)
+
+        # Show menu below the button
+        menu.exec(self.model_btn.mapToGlobal(self.model_btn.rect().bottomLeft()))
+
+    def switch_model(self, model_name, backend):
+        self.current_model_name = model_name
+        self.current_backend = backend
+        self.model_changed.emit(model_name, backend)
 
     # === Toolbar actions ===
     def refresh_tree(self):

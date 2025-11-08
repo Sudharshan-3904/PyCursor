@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt
 from .editor import CodeEditor
 from .sidebar import SideBar
 from .terminal import Terminal
-from ..ai.ai_engine import AIEngine
+from ..ai.ai_engine import AIAssistantWidget
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
         self._create_menu_bar()
 
-        self.ai_engine = AIEngine()         # TODO - Implement the logic for the AI Engine
+        self.ai_engine = AIAssistantWidget()         # TODO - Implement the logic for the AI Engine
 
     def _create_menu_bar(self):
         menu_bar = QMenuBar()

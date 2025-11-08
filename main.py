@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 
 # Import your main app
-import core.app_main as app_main
+from core import app_main
 
 # Import components to patch
 from core.ui.editor import CodeEditor
