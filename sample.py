@@ -1,7 +1,7 @@
 import requests
 
 # Define the URL for the Ollama server
-url = "http://localhost:11434/api/chat"  # Correct endpoint
+url = "http://localhost:1234/v1/models"  # Correct endpoint
 
 # Define the headers
 headers = {
@@ -16,7 +16,7 @@ payload = {
 }
 
 # Make the POST request
-response = requests.post(url, headers=headers, json=payload)
+response = requests.get(url)
 
 # Check the response
 if response.status_code == 200:
