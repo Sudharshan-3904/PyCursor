@@ -247,6 +247,10 @@ class AIEngine(QWidget):
         except Exception as e:
             return f"[AI Error] {e}"
 
+    def _contains_edit_tags(self, response: str) -> bool:
+        """Check if response contains edit tags indicating file modification."""
+        return "<<<edit>>>" in response and "<</edit>>" in response
+
     def handle_send(self):
         user_input = self.input_field.text().strip()
         if not user_input:
@@ -267,18 +271,38 @@ class AIEngine(QWidget):
         self.chat_area.append(f"<b>AI:</b> {response}\n")
         self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
 
-        # Apply the response to the currently open file (or create a new one)
-        try:
-            self.apply_response_to_editor(response)
-        except Exception as e:
-            # non-fatal; show in chat area for debugging
-            self.chat_area.append(f"<i>[Failed to apply response to file: {e}]</i>")
+        # Only apply to editor if response contains edit tags (file modification intent)
+        if self._contains_edit_tags(response):
+            try:
+                self.apply_response_to_editor(response)
+            except Exception as e:
+                # non-fatal; show in chat area for debugging
+                self.chat_area.append(f"<i>[Failed to apply response to file: {e}]</i>")
+        # If no edit tags, response is treated as a Q&A answer and stays in chat area
 
     def apply_response_to_editor(self, response: str):
         """
-        Append the AI response to the current open file (or create a new file).
+        Extract content from edit tags and apply to the currently open file (or create a new one).
+        Expects format: <<<edit>>>content here<</edit>>
         After modification, notify the main window with the number of lines added.
         """
+        # Extract content between edit tags
+        edit_start = response.find("<<<edit>>>")
+        edit_end = response.find("<</edit>>")
+        
+        if edit_start != -1 and edit_end != -1:
+            # Extract content between tags
+            edit_start += len("<<<edit>>>")
+            extracted_content = response[edit_start:edit_end].strip()
+        else:
+            # No tags found, use entire response
+            extracted_content = response
+        
+        if not extracted_content:
+            # No content to write
+            self.chat_area.append(f"<i>[No content to write to file]</i>")
+            return
+
         if not hasattr(self, "main_window") or self.main_window is None:
             # No main window linked: create file in cwd
             project_root = os.getcwd()
@@ -287,8 +311,8 @@ class AIEngine(QWidget):
 
             with open(full_path, "a", encoding="utf-8") as f:
                 before_lines = 0
-                f.write(response if response.endswith("\n") else response + "\n")
-                added_lines = len(response.splitlines())
+                f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
+                added_lines = len(extracted_content.splitlines())
             # Can't notify UI, but append a notice to chat
             self.chat_area.append(f"<i>[Wrote {added_lines} lines to {filename}]</i>")
             return
@@ -306,8 +330,8 @@ class AIEngine(QWidget):
             filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
             full_path = os.path.join(project_root, filename)
             with open(full_path, "w", encoding="utf-8") as f:
-                f.write(response if response.endswith("\n") else response + "\n")
-            added_lines = len(response.splitlines())
+                f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
+            added_lines = len(extracted_content.splitlines())
             # Notify main window UI
             try:
                 self.main_window.notify_lines_added(filename, added_lines)
@@ -319,27 +343,28 @@ class AIEngine(QWidget):
         file_path = getattr(editor, "file_path", None)
         if file_path:
             try:
-                # read existing count
-                if os.path.exists(file_path):
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        before_count = len(f.readlines())
+                # Get current editor content
+                current_content = editor.toPlainText()
+                
+                # Append extracted content to current content
+                if current_content and not current_content.endswith("\n"):
+                    new_content = current_content + "\n" + extracted_content
                 else:
-                    before_count = 0
-
-                with open(file_path, "a", encoding="utf-8") as f:
-                    f.write(response if response.endswith("\n") else response + "\n")
-                after_count = before_count + len(response.splitlines())
-                added_lines = after_count - before_count
-
-                # Update the editor view (if it supports loading from disk or we can append text)
-                try:
-                    # best-effort: append text to editor widget so UI updates immediately
-                    editor.moveCursor(editor.textCursor().End)
-                    editor.insertPlainText("\n" + response)
-                except Exception:
-                    # fallback: trigger editor to reload from disk if it has reload/open method
-                    if hasattr(editor, "load_from_path"):
-                        editor.load_from_path(file_path)
+                    new_content = current_content + extracted_content
+                
+                # Ensure it ends with newline
+                if not new_content.endswith("\n"):
+                    new_content += "\n"
+                
+                # Write entire content to file
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                
+                # Update editor widget with new content
+                editor.setPlainText(new_content)
+                
+                # Count added lines
+                added_lines = len(extracted_content.splitlines())
 
                 # Notify main window UI
                 self.main_window.notify_lines_added(os.path.basename(file_path), added_lines)
@@ -351,8 +376,8 @@ class AIEngine(QWidget):
             filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
             full_path = os.path.join(project_root, filename)
             with open(full_path, "w", encoding="utf-8") as f:
-                f.write(response if response.endswith("\n") else response + "\n")
-            added_lines = len(response.splitlines())
+                f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
+            added_lines = len(extracted_content.splitlines())
             # Ask main window to open this file if it has such method
             if hasattr(self.main_window, "open_file_in_tab"):
                 self.main_window.open_file_in_tab(full_path)
