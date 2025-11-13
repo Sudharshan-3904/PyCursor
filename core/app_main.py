@@ -1,6 +1,8 @@
 import sys
 import os
 import json
+import subprocess
+import tempfile
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDockWidget, QTabWidget, QFileDialog, QMessageBox, QTabBar, QPushButton, QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
@@ -106,6 +108,13 @@ class PyCursorMain(QMainWindow):
         file_menu.addAction(open_action)
         file_menu.addAction(open_folder_action)
         file_menu.addAction(save_action)
+
+        # Run menu
+        run_menu = menu_bar.addMenu("Run")
+        run_action = QAction("Run Code", self)
+        run_action.setShortcut("Ctrl+Shift+R")
+        run_action.triggered.connect(self.execute_current_file)
+        run_menu.addAction(run_action)
 
     def open_file_dialog(self):
         # Open file dialog starting in last open folder
@@ -264,6 +273,52 @@ class PyCursorMain(QMainWindow):
             QTimer.singleShot(4000, lambda: self.right_status_label.setText("Ready"))
         except Exception:
             pass
+
+    def execute_current_file(self):
+        """Execute the code in the currently open editor."""
+        editor = self.get_current_editor()
+        if editor is None:
+            QMessageBox.warning(self, "No File Open", "Please open a file to execute.")
+            return
+
+        file_path = getattr(editor, "file_path", None)
+        
+        # Save the file first if it has a path
+        if file_path:
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(editor.text())
+            except Exception as e:
+                QMessageBox.critical(self, "Save Error", f"Failed to save file: {e}")
+                return
+        else:
+            # If no file path, create a temporary file
+            import tempfile
+            try:
+                fd, file_path = tempfile.mkstemp(suffix=".py", text=True)
+                with os.fdopen(fd, 'w', encoding="utf-8") as f:
+                    f.write(editor.text())
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to create temporary file: {e}")
+                return
+
+        # Get the terminal widget
+        if self.terminal_tabs.count() == 0:
+            self.add_terminal_tab()
+        
+        current_terminal_index = self.terminal_tabs.currentIndex()
+        if current_terminal_index < 0:
+            current_terminal_index = 0
+        
+        terminal = self.terminal_tabs.widget(current_terminal_index)
+        
+        if terminal and hasattr(terminal, 'execute_command'):
+            # Execute the file
+            command = f"python \"{file_path}\""
+            terminal.execute_command(command)
+        else:
+            # Fallback: Show message
+            QMessageBox.information(self, "Executing", f"Running: python \"{file_path}\"")
 
     def add_terminal_tab(self, name="Terminal"):
         term = Terminal()

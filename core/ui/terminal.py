@@ -100,3 +100,22 @@ class Terminal(QTextEdit):
         self.append("-"*75)
         self.append(f"[Log] ::: {msgStr}")
         self.append("-"*75)
+
+    def execute_command(self, command: str):
+        """Execute a command in the terminal."""
+        if not self.process.state() == QProcess.ProcessState.Running:
+            return
+        
+        # Move cursor to end and add command
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.setTextCursor(cursor)
+        
+        # Add visual separator
+        self.append("\n" + "="*75)
+        self.append(f">>> Executing: {command}")
+        self.append("="*75 + "\n")
+        
+        # Send command to process
+        self.process.write((command + "\n").encode("utf-8"))
+        self.ensureCursorVisible()
