@@ -19,8 +19,6 @@ class ReloadSignals(QObject):
 
 
 class ReloadHandler(FileSystemEventHandler):
-    """Watchdog handler to detect file changes."""
-
     def __init__(self, signals):
         super().__init__()
         self.signals = signals
@@ -51,7 +49,6 @@ class HotReloader(QObject):
         }
 
     def start(self):
-        """Start the file observer."""
         watch_path = os.path.abspath(".")
         print(f"[HotReload] Watching for changes in: {watch_path}")
 
@@ -68,7 +65,6 @@ class HotReloader(QObject):
             self.observer.join()
 
     def _handle_reload(self, src_path):
-        """Figure out which component to reload."""
         project_root = os.path.abspath(".")
         rel_path = os.path.relpath(src_path, project_root).replace("\\", "/")
         print(f"[HotReload] Detected change: {rel_path}")

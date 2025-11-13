@@ -49,7 +49,6 @@ class Terminal(QTextEdit):
         self.append(self.prompt)
 
     def _detect_shell(self):
-        """Detect system shell (bash/zsh/cmd/powershell)."""
         if platform.system() == "Windows":
             return os.environ.get("COMSPEC", "cmd.exe")
         elif platform.system() == "Darwin":
@@ -58,7 +57,6 @@ class Terminal(QTextEdit):
             return os.environ.get("SHELL", "/bin/bash")
 
     def _get_env_activation_path(self):
-        """Return path to venv's activate script."""
         venv_path = os.path.join(self.project_path, "venv")
         if os.path.exists(venv_path):
             if platform.system() == "Windows":
@@ -68,7 +66,6 @@ class Terminal(QTextEdit):
         return None
 
     def _on_output(self):
-        """Append output from shell."""
         data = self.process.readAllStandardOutput().data().decode("utf-8", errors="ignore")
         if data:
             self.moveCursor(QTextCursor.MoveOperation.End)
@@ -76,7 +73,6 @@ class Terminal(QTextEdit):
             self.ensureCursorVisible()
 
     def keyPressEvent(self, event):
-        """Send input to shell."""
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         self.setTextCursor(cursor)
@@ -96,13 +92,11 @@ class Terminal(QTextEdit):
         super().keyPressEvent(event)
     
     def log(self, msgStr: str = ""):
-        """Log a Message to the shell"""
         self.append("-"*75)
         self.append(f"[Log] ::: {msgStr}")
         self.append("-"*75)
 
     def execute_command(self, command: str):
-        """Execute a command in the terminal."""
         if not self.process.state() == QProcess.ProcessState.Running:
             return
         

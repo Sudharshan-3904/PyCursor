@@ -206,40 +206,26 @@ class AIEngine(QWidget):
     
     
     def set_main_window(self, main_window):
-        """Provide a reference to the main application window so AI can modify files / notify."""
         self.main_window = main_window
 
     def run_model(self, prompt: str) -> str:
-        """
-        Unified entry for gathering full LLM response.
-        Accepts either:
-          - a full string response, or
-          - an iterable/generator yielding chunks (streaming)
-        This will collect the entire response and return it as a single string.
-        """
         try:
-            # Try getting a response from local handler
             resp = self.local_model_handler.local_model_response(prompt)
 
-            # If response is already a string, return it
             if isinstance(resp, str):
                 return resp
 
-            # If response is iterable (streaming chunks), join them
             if hasattr(resp, "__iter__") and not isinstance(resp, (dict, bytes)):
                 collected = []
                 for chunk in resp:
                     try:
                         collected.append(str(chunk))
                     except Exception:
-                        # best-effort append
                         collected.append(repr(chunk))
                 return "".join(collected)
 
-            # Fallback: stringify whatever we got
             return str(resp)
         except TypeError:
-            # If local_model_response signature is different, try calling without args returned above
             try:
                 return str(self.local_model_handler.local_model_response(prompt))
             except Exception as e:
@@ -248,7 +234,6 @@ class AIEngine(QWidget):
             return f"[AI Error] {e}"
 
     def _contains_edit_tags(self, response: str) -> bool:
-        """Check if response contains edit tags indicating file modification."""
         return "<<<edit>>>" in response and "<</edit>>" in response
 
     def handle_send(self):
@@ -260,51 +245,35 @@ class AIEngine(QWidget):
         self.input_field.clear()
 
         if self.using_api:
-            # keep existing behaviour for API placeholder
             model_identifier = next(iter(self.models.values()), "default")
             response = self.api_model_response(user_input, model_identifier)
         else:
-            # Use unified run_model to collect full response (supports streaming or full-string)
             response = self.run_model(user_input)
 
-        # Append to chat area
         self.chat_area.append(f"<b>AI:</b> {response}\n")
         self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
 
-        # Only apply to editor if response contains edit tags (file modification intent)
         if self._contains_edit_tags(response):
             try:
                 self.apply_response_to_editor(response)
             except Exception as e:
-                # non-fatal; show in chat area for debugging
                 self.chat_area.append(f"<i>[Failed to apply response to file: {e}]</i>")
-        # If no edit tags, response is treated as a Q&A answer and stays in chat area
 
     def apply_response_to_editor(self, response: str):
-        """
-        Extract content from edit tags and apply to the currently open file (or create a new one).
-        Expects format: <<<edit>>>content here<</edit>>
-        After modification, notify the main window with the number of lines added.
-        """
-        # Extract content between edit tags
         edit_start = response.find("<<<edit>>>")
         edit_end = response.find("<</edit>>")
         
         if edit_start != -1 and edit_end != -1:
-            # Extract content between tags
             edit_start += len("<<<edit>>>")
             extracted_content = response[edit_start:edit_end].strip()
         else:
-            # No tags found, use entire response
             extracted_content = response
         
         if not extracted_content:
-            # No content to write
             self.chat_area.append(f"<i>[No content to write to file]</i>")
             return
 
         if not hasattr(self, "main_window") or self.main_window is None:
-            # No main window linked: create file in cwd
             project_root = os.getcwd()
             filename = f"ai_output_{int(time.time())}.txt"
             full_path = os.path.join(project_root, filename)
@@ -313,11 +282,9 @@ class AIEngine(QWidget):
                 before_lines = 0
                 f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
                 added_lines = len(extracted_content.splitlines())
-            # Can't notify UI, but append a notice to chat
             self.chat_area.append(f"<i>[Wrote {added_lines} lines to {filename}]</i>")
             return
 
-        # Get current editor widget from main window
         editor = None
         try:
             editor = self.main_window.get_current_editor()
@@ -325,60 +292,48 @@ class AIEngine(QWidget):
             editor = None
 
         if editor is None:
-            # No open editor -> create new file in project root
             project_root = getattr(self.main_window, "project_path", os.getcwd())
             filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
             full_path = os.path.join(project_root, filename)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
             added_lines = len(extracted_content.splitlines())
-            # Notify main window UI
             try:
                 self.main_window.notify_lines_added(filename, added_lines)
             except Exception:
                 self.chat_area.append(f"<i>[Created {filename} ({added_lines} lines)]</i>")
             return
 
-        # If editor has an associated file path, append there. Otherwise create a new untitled file/tab.
         file_path = getattr(editor, "file_path", None)
         if file_path:
             try:
-                # Get current editor content
                 current_content = editor.toPlainText()
                 
-                # Append extracted content to current content
                 if current_content and not current_content.endswith("\n"):
                     new_content = current_content + "\n" + extracted_content
                 else:
                     new_content = current_content + extracted_content
                 
-                # Ensure it ends with newline
                 if not new_content.endswith("\n"):
                     new_content += "\n"
                 
-                # Write entire content to file
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
                 
-                # Update editor widget with new content
                 editor.setPlainText(new_content)
                 
-                # Count added lines
                 added_lines = len(extracted_content.splitlines())
 
-                # Notify main window UI
                 self.main_window.notify_lines_added(os.path.basename(file_path), added_lines)
             except Exception as e:
                 raise
         else:
-            # Editor has no file path -> create a new file and load it as a new tab if main_window supports it
             project_root = getattr(self.main_window, "project_path", os.getcwd())
             filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
             full_path = os.path.join(project_root, filename)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
             added_lines = len(extracted_content.splitlines())
-            # Ask main window to open this file if it has such method
             if hasattr(self.main_window, "open_file_in_tab"):
                 self.main_window.open_file_in_tab(full_path)
             self.main_window.notify_lines_added(filename, added_lines)

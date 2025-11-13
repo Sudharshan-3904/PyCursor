@@ -139,7 +139,6 @@ to **indicate exactly where the model should modify the file**.
             response = requests.post(f"{self.lmstudio_url}/v1/chat/completions", json=payload)
             response.raise_for_status()
             json_resp = response.json()
-            # print("Data from LM Studio:", json_resp, "\t\t            <- End")
             return json_resp["choices"][0]["message"]["content"]
         except Exception as e:
             return f"[Error querying LM Studio: {e}]"
