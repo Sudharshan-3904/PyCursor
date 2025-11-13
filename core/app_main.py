@@ -1,7 +1,8 @@
 import sys
 import os
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDockWidget, QTabWidget, QFileDialog, QMessageBox, QTabBar, QPushButton
-from PyQt6.QtCore import Qt
+import json
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDockWidget, QTabWidget, QFileDialog, QMessageBox, QTabBar, QPushButton, QWidget, QLabel, QVBoxLayout
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 
 from core.ui.sidebar import SideBar
@@ -18,6 +19,10 @@ class PyCursorMain(QMainWindow):
         self.setWindowTitle("PyCursor IDE")
         self.resize(1200, 800)
         self.close_icon = load_icon("close.png")
+        # Load settings and restore last-open folder if available
+        self.settings_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "settings.json")
+        self._settings = self._load_settings()
+        self.project_path = self._settings.get("last_open_folder", os.getcwd())
 
         self.editor_tabs = QTabWidget()
         self.editor_tabs.setTabsClosable(True)
@@ -28,7 +33,7 @@ class PyCursorMain(QMainWindow):
                 image: url(close.png);
                 subcontrol-position: right;
             }
-            QTabBar::close-button:hover {
+            QTabBar::close-button:hover {se
                 image: url(close-icon-hover.png);
             }
         """)
@@ -46,6 +51,11 @@ class PyCursorMain(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.sidebar_dock)
 
         self.ai_widget = AIEngine()
+        # Let AI engine call back into the main window for applying responses
+        try:
+            self.ai_widget.set_main_window(self)
+        except Exception:
+            pass
         self.ai_dock = QDockWidget("AI Assistant", self)
         self.ai_dock.setWidget(self.ai_widget)
         self.ai_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea)
@@ -54,6 +64,19 @@ class PyCursorMain(QMainWindow):
             QDockWidget.DockWidgetFeature.DockWidgetClosable
         )
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_dock)
+
+        # Right-side status dock to show notifications like "x lines added to file"
+        self.status_dock = QDockWidget("Status", self)
+        status_widget = QWidget()
+        status_layout = QVBoxLayout()
+        status_layout.setContentsMargins(6, 6, 6, 6)
+        self.right_status_label = QLabel("Ready")
+        status_layout.addWidget(self.right_status_label)
+        status_layout.addStretch()
+        status_widget.setLayout(status_layout)
+        self.status_dock.setWidget(status_widget)
+        self.status_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.status_dock)
 
         self.terminal_tabs = QTabWidget()
         self.add_terminal_tab("Terminal 1")
@@ -72,19 +95,47 @@ class PyCursorMain(QMainWindow):
     def create_menu_bar(self):
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
-
         open_action = QAction("Open File", self)
         open_action.triggered.connect(self.open_file_dialog)
+        open_folder_action = QAction("Open Folder", self)
+        open_folder_action.triggered.connect(self.open_folder_dialog)
         save_action = QAction("Save File", self)
         save_action.triggered.connect(self.save_file)
 
+        # Add actions: Open File, Open Folder, Save File
         file_menu.addAction(open_action)
+        file_menu.addAction(open_folder_action)
         file_menu.addAction(save_action)
 
     def open_file_dialog(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "All Files (*.*)")
+        # Open file dialog starting in last open folder
+        start_dir = self.project_path or os.getcwd()
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", start_dir, "All Files (*.*)")
         if file_path:
             self.open_file_in_tab(file_path)
+            # update last open folder
+            self._update_last_open_folder(os.path.dirname(file_path))
+
+    def open_folder_dialog(self):
+        """Open a folder chooser, update project_path and try to refresh the sidebar."""
+        start_dir = self.project_path or os.getcwd()
+        folder = QFileDialog.getExistingDirectory(self, "Open Folder", start_dir)
+        if folder:
+            # persist and set as current project path
+            self._update_last_open_folder(folder)
+            self.project_path = folder
+            # Try to tell the sidebar to update its root (best-effort)
+            try:
+                if hasattr(self.sidebar, "setRootPath"):
+                    self.sidebar.setRootPath(folder)
+                elif hasattr(self.sidebar, "set_root_path"):
+                    self.sidebar.set_root_path(folder)
+                elif hasattr(self.sidebar, "set_root"):
+                    self.sidebar.set_root(folder)
+                elif hasattr(self.sidebar, "refresh"):
+                    self.sidebar.refresh()
+            except Exception:
+                pass
 
     def save_file(self):
         editor = self.editor_tabs.currentWidget()
@@ -97,13 +148,16 @@ class PyCursorMain(QMainWindow):
                 except Exception as e:
                     print(f"Failed to save {file_path}: {e}")
             else:
-                file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "All Files (*.*)")
+                start_dir = self.project_path or os.getcwd()
+                file_path, _ = QFileDialog.getSaveFileName(self, "Save File", start_dir, "All Files (*.*)")
                 if file_path:
                     try:
                         with open(file_path, "w", encoding="utf-8") as f:
                             f.write(editor.toPlainText())
                         editor.file_path = file_path
                         self.editor_tabs.setTabText(self.editor_tabs.currentIndex(), os.path.basename(file_path))
+                        # update last open folder
+                        self._update_last_open_folder(os.path.dirname(file_path))
                     except Exception as e:
                         print(f"Failed to save {file_path}: {e}")
 
@@ -146,6 +200,38 @@ class PyCursorMain(QMainWindow):
 
         tab_bar = self.editor_tabs.tabBar()
         tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, close_btn)
+        # update last open folder when a file is opened
+        try:
+            self._update_last_open_folder(os.path.dirname(file_path))
+        except Exception:
+            pass
+
+    def _load_settings(self) -> dict:
+        """Load settings from config/settings.json if present."""
+        try:
+            if os.path.exists(self.settings_path):
+                with open(self.settings_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        return {}
+
+    def _save_settings(self):
+        """Save current settings dict to settings.json (create config dir if needed)."""
+        try:
+            config_dir = os.path.dirname(self.settings_path)
+            os.makedirs(config_dir, exist_ok=True)
+            with open(self.settings_path, "w", encoding="utf-8") as f:
+                json.dump(self._settings, f, indent=2)
+        except Exception:
+            pass
+
+    def _update_last_open_folder(self, folder_path: str):
+        if not folder_path:
+            return
+        self.project_path = folder_path
+        self._settings["last_open_folder"] = folder_path
+        self._save_settings()
 
     def close_editor_tab(self, index):
         editor = self.editor_tabs.widget(index)
@@ -162,6 +248,22 @@ class PyCursorMain(QMainWindow):
                 self.save_file()
         self.editor_tabs.removeTab(index)
         editor.deleteLater()
+
+    def get_current_editor(self):
+        """Return the current editor widget (or None)."""
+        try:
+            return self.editor_tabs.currentWidget()
+        except Exception:
+            return None
+
+    def notify_lines_added(self, filename: str, added_lines: int):
+        """Update the right status label when AI modifies/creates files."""
+        try:
+            self.right_status_label.setText(f"{added_lines} lines added to {filename}")
+            # clear label after a few seconds
+            QTimer.singleShot(4000, lambda: self.right_status_label.setText("Ready"))
+        except Exception:
+            pass
 
     def add_terminal_tab(self, name="Terminal"):
         term = Terminal()

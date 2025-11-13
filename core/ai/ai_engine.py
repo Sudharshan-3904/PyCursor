@@ -1,4 +1,7 @@
 import sys
+import os
+import time
+from datetime import datetime
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QMenu,
     QTextEdit, QPushButton, QLineEdit, QInputDialog
@@ -200,6 +203,160 @@ class AIEngine(QWidget):
 
     def api_model_response(self, prompt, model_identifier):
         return f"[API response from {model_identifier}]"
+    
+    
+    def set_main_window(self, main_window):
+        """Provide a reference to the main application window so AI can modify files / notify."""
+        self.main_window = main_window
+
+    def run_model(self, prompt: str) -> str:
+        """
+        Unified entry for gathering full LLM response.
+        Accepts either:
+          - a full string response, or
+          - an iterable/generator yielding chunks (streaming)
+        This will collect the entire response and return it as a single string.
+        """
+        try:
+            # Try getting a response from local handler
+            resp = self.local_model_handler.local_model_response(prompt)
+
+            # If response is already a string, return it
+            if isinstance(resp, str):
+                return resp
+
+            # If response is iterable (streaming chunks), join them
+            if hasattr(resp, "__iter__") and not isinstance(resp, (dict, bytes)):
+                collected = []
+                for chunk in resp:
+                    try:
+                        collected.append(str(chunk))
+                    except Exception:
+                        # best-effort append
+                        collected.append(repr(chunk))
+                return "".join(collected)
+
+            # Fallback: stringify whatever we got
+            return str(resp)
+        except TypeError:
+            # If local_model_response signature is different, try calling without args returned above
+            try:
+                return str(self.local_model_handler.local_model_response(prompt))
+            except Exception as e:
+                return f"[AI Error] {e}"
+        except Exception as e:
+            return f"[AI Error] {e}"
+
+    def handle_send(self):
+        user_input = self.input_field.text().strip()
+        if not user_input:
+            return
+
+        self.chat_area.append(f"<b>User:</b> {user_input}")
+        self.input_field.clear()
+
+        if self.using_api:
+            # keep existing behaviour for API placeholder
+            model_identifier = next(iter(self.models.values()), "default")
+            response = self.api_model_response(user_input, model_identifier)
+        else:
+            # Use unified run_model to collect full response (supports streaming or full-string)
+            response = self.run_model(user_input)
+
+        # Append to chat area
+        self.chat_area.append(f"<b>AI:</b> {response}\n")
+        self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
+
+        # Apply the response to the currently open file (or create a new one)
+        try:
+            self.apply_response_to_editor(response)
+        except Exception as e:
+            # non-fatal; show in chat area for debugging
+            self.chat_area.append(f"<i>[Failed to apply response to file: {e}]</i>")
+
+    def apply_response_to_editor(self, response: str):
+        """
+        Append the AI response to the current open file (or create a new file).
+        After modification, notify the main window with the number of lines added.
+        """
+        if not hasattr(self, "main_window") or self.main_window is None:
+            # No main window linked: create file in cwd
+            project_root = os.getcwd()
+            filename = f"ai_output_{int(time.time())}.txt"
+            full_path = os.path.join(project_root, filename)
+
+            with open(full_path, "a", encoding="utf-8") as f:
+                before_lines = 0
+                f.write(response if response.endswith("\n") else response + "\n")
+                added_lines = len(response.splitlines())
+            # Can't notify UI, but append a notice to chat
+            self.chat_area.append(f"<i>[Wrote {added_lines} lines to {filename}]</i>")
+            return
+
+        # Get current editor widget from main window
+        editor = None
+        try:
+            editor = self.main_window.get_current_editor()
+        except Exception:
+            editor = None
+
+        if editor is None:
+            # No open editor -> create new file in project root
+            project_root = getattr(self.main_window, "project_path", os.getcwd())
+            filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
+            full_path = os.path.join(project_root, filename)
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(response if response.endswith("\n") else response + "\n")
+            added_lines = len(response.splitlines())
+            # Notify main window UI
+            try:
+                self.main_window.notify_lines_added(filename, added_lines)
+            except Exception:
+                self.chat_area.append(f"<i>[Created {filename} ({added_lines} lines)]</i>")
+            return
+
+        # If editor has an associated file path, append there. Otherwise create a new untitled file/tab.
+        file_path = getattr(editor, "file_path", None)
+        if file_path:
+            try:
+                # read existing count
+                if os.path.exists(file_path):
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        before_count = len(f.readlines())
+                else:
+                    before_count = 0
+
+                with open(file_path, "a", encoding="utf-8") as f:
+                    f.write(response if response.endswith("\n") else response + "\n")
+                after_count = before_count + len(response.splitlines())
+                added_lines = after_count - before_count
+
+                # Update the editor view (if it supports loading from disk or we can append text)
+                try:
+                    # best-effort: append text to editor widget so UI updates immediately
+                    editor.moveCursor(editor.textCursor().End)
+                    editor.insertPlainText("\n" + response)
+                except Exception:
+                    # fallback: trigger editor to reload from disk if it has reload/open method
+                    if hasattr(editor, "load_from_path"):
+                        editor.load_from_path(file_path)
+
+                # Notify main window UI
+                self.main_window.notify_lines_added(os.path.basename(file_path), added_lines)
+            except Exception as e:
+                raise
+        else:
+            # Editor has no file path -> create a new file and load it as a new tab if main_window supports it
+            project_root = getattr(self.main_window, "project_path", os.getcwd())
+            filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
+            full_path = os.path.join(project_root, filename)
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(response if response.endswith("\n") else response + "\n")
+            added_lines = len(response.splitlines())
+            # Ask main window to open this file if it has such method
+            if hasattr(self.main_window, "open_file_in_tab"):
+                self.main_window.open_file_in_tab(full_path)
+            self.main_window.notify_lines_added(filename, added_lines)
 
 
 if __name__ == "__main__":

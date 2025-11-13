@@ -1,5 +1,6 @@
 {
   "theme": "dark",
   "ai_provider": "openai",
-  "autosave": true
+  "autosave": true,
+  "last_open_folder": "E:/Tester/PyCursorTest"
 }

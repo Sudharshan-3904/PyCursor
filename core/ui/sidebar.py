@@ -43,9 +43,9 @@ class SideBar(QWidget):
         toolbar_layout.setSpacing(6)
         toolbar.setLayout(toolbar_layout)
 
-        dir_label = QLabel(os.path.basename(self.root_path))
-        dir_label.setStyleSheet("color: #dddddd; font-size: 11px; font-weight: bold;")
-        dir_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.dir_label = QLabel(os.path.basename(self.root_path))
+        self.dir_label.setStyleSheet("color: #dddddd; font-size: 11px; font-weight: bold;")
+        self.dir_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         refresh_btn = QPushButton()
         refresh_btn.setIcon(load_icon("refresh.png"))
@@ -76,7 +76,7 @@ class SideBar(QWidget):
         self.filter_btn.setStyleSheet("border: none;")
         self.filter_btn.clicked.connect(self.toggle_filter)
 
-        toolbar_layout.addWidget(dir_label)
+        toolbar_layout.addWidget(self.dir_label)
         toolbar_layout.addWidget(refresh_btn)
         toolbar_layout.addWidget(new_file_btn)
         toolbar_layout.addWidget(new_folder_btn)
@@ -150,6 +150,26 @@ class SideBar(QWidget):
     def refresh_tree(self):
         root_index = self.model.index(self.root_path)
         self.tree.setRootIndex(self.proxy_model.mapFromSource(root_index))
+
+    def set_root_path(self, path: str):
+        """Set a new root path for the sidebar and refresh the view."""
+        try:
+            if not path:
+                return
+            self.root_path = path
+            # update label text
+            try:
+                self.dir_label.setText(os.path.basename(self.root_path) or self.root_path)
+            except Exception:
+                pass
+            # update QFileSystemModel root and refresh tree view
+            try:
+                self.model.setRootPath(self.root_path)
+            except Exception:
+                pass
+            self.refresh_tree()
+        except Exception:
+            pass
 
     def toggle_filter(self):
         self.filter_mode = not self.filter_mode
