@@ -152,7 +152,6 @@ class SideBar(QWidget):
         self.tree.setRootIndex(self.proxy_model.mapFromSource(root_index))
 
     def set_root_path(self, path: str):
-        """Set a new root path for the sidebar and refresh the view."""
         try:
             if not path:
                 return

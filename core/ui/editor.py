@@ -4,7 +4,6 @@ from PyQt6.QtCore import QPoint
 import ast
 
 class LanguageConfig:
-    """Holds editor customization per language."""
     def __init__(self, lexer_class, font=None, colors=None, indent=4, use_tabs=False):
         self.lexer_class = lexer_class
         self.font = font or QFont("Consolas", 12)
@@ -84,7 +83,6 @@ class CodeEditor(QsciScintilla):
         self.setIndentationsUseTabs(False)
 
     def setup_fold_markers(self):
-        """Custom fold arrows."""
         FOLD_CLOSED_MARKER = 1
         FOLD_OPEN_MARKER = 2
 

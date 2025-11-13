@@ -1,4 +1,3 @@
-# main_window.py
 from PyQt6.QtWidgets import (
     QMainWindow, QSplitter, QWidget, QVBoxLayout, QFileDialog, QMenuBar, QApplication
 )
@@ -33,16 +32,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
         self._create_menu_bar()
 
-        # Install AI actions and get the ai_manager back
-        # install_ai_actions will add the menu action, shortcut, and wire everything up.
-        # It will also attach an `ai_manager` and `llm_client` to this MainWindow object to allow dynamic control.
-        self.ai_manager = install_ai_actions(self)  # returns the ai_manager instance
+        self.ai_manager = install_ai_actions(self)
 
-        # connect sidebar model change events to update LLM client config (so you can pick model/backend in sidebar)
         try:
             self.sidebar.model_changed.connect(self.on_model_changed)
         except Exception:
-            # model_changed may not exist in all sidebar versions
             pass
 
     def _create_menu_bar(self):
@@ -64,12 +58,10 @@ class MainWindow(QMainWindow):
         if file_path:
             with open(file_path, "r", encoding="utf-8") as f:
                 self.editor.setText(f.read())
-            # store the current file path for the ai flow and status
             self.current_file_path = file_path
             self.statusBar().showMessage(f"Opened {file_path}", 3000)
 
     def save_file(self):
-        # save to the known path if set, else ask
         if hasattr(self, "current_file_path") and self.current_file_path:
             file_path = self.current_file_path
         else:
@@ -79,19 +71,13 @@ class MainWindow(QMainWindow):
             self.current_file_path = file_path
 
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write(self.editor.text())  # QsciScintilla uses .text()
+            f.write(self.editor.text())
         self.statusBar().showMessage(f"Saved {file_path}", 3000)
 
     def on_model_changed(self, model_name: str, backend: str):
-        """
-        Called when the sidebar model is changed. We forward the selected model/backend
-        to the AI manager's llm client config so future requests use the chosen model.
-        """
-        # ai_manager and llm_client are attached by install_ai_actions
         try:
             llm_client = getattr(self, "_llm_client", None)
             if llm_client:
-                # Simple, flexible contract: set config keys
                 llm_client.config["model_name"] = model_name
                 llm_client.config["backend"] = backend
                 self.statusBar().showMessage(f"Switched model to {model_name} ({backend})", 3000)
