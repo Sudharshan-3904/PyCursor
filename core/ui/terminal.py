@@ -31,6 +31,12 @@ class Terminal(QTextEdit):
         self.process.readyReadStandardOutput.connect(self._on_output)
         self.process.readyReadStandardError.connect(self._on_output)
 
+        # Ensure the QProcess runs in the project directory
+        try:
+            self.process.setWorkingDirectory(self.project_path)
+        except Exception:
+            pass
+
         env = QProcessEnvironment.systemEnvironment()
 
         for key, value in os.environ.items():
@@ -44,8 +50,32 @@ class Terminal(QTextEdit):
 
         self.process.setProcessEnvironment(env)
 
-        self.process.start(self.shell)
-        self.prompt = f"{os.getcwd()} $ " if os.name != "nt" else f"{os.getcwd()}> "
+        # Start the shell with sensible args per-platform so it stays interactive
+        shell_prog = self.shell
+        shell_args = []
+        if platform.system() == "Windows":
+            lower = shell_prog.lower()
+            if "powershell" in lower or "pwsh" in lower:
+                shell_args = ["-NoExit"]
+            else:
+                shell_args = ["/K"]
+        else:
+            base = os.path.basename(shell_prog)
+            if base in ("bash", "zsh", "sh"):
+                shell_args = ["-i"]
+
+        # Start and ensure it started
+        if shell_args:
+            self.process.start(shell_prog, shell_args)
+        else:
+            self.process.start(shell_prog)
+
+        if not self.process.waitForStarted(3000):
+            self.append("[Terminal] Failed to start shell process")
+
+        self.prompt = f"{self.project_path} $ " if os.name != "nt" else f"{self.project_path}> "
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setFocus()
         self.append(self.prompt)
 
     def _detect_shell(self):
@@ -78,9 +108,32 @@ class Terminal(QTextEdit):
         self.setTextCursor(cursor)
 
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            text = self.toPlainText().split("\n")[-1].replace(self.prompt, "")
-            if text.strip():
-                self.process.write((text.strip() + "\n").encode("utf-8"))
+            # Extract the user's typed command from the last line.
+            # Be robust against prompt formatting differences (with/without trailing space).
+            last_line = self.toPlainText().split("\n")[-1]
+            cmd = last_line
+            if self.prompt and self.prompt in last_line:
+                cmd = last_line.replace(self.prompt, "", 1)
+            else:
+                # Try to find common prompt separators and take text after them
+                for sep in (">", "$", ":"):
+                    idx = last_line.rfind(sep)
+                    if idx != -1:
+                        cmd = last_line[idx + 1 :].lstrip()
+                        break
+
+            cmd = cmd.strip()
+            # Handle local clear commands: these don't emit output from the
+            # shell when running under a GUI process, so clear the widget
+            # locally instead of sending to the shell.
+            if cmd and cmd.lower() in ("cls", "clear"):
+                self.clear()
+                self.append(self.prompt)
+                return
+
+            if cmd:
+                newline = "\r\n" if platform.system() == "Windows" else "\n"
+                self.process.write((cmd + newline).encode("utf-8"))
             self.append("")
             return
 
