@@ -31,11 +31,9 @@ class Terminal(QTextEdit):
         self.process.readyReadStandardOutput.connect(self._on_output)
         self.process.readyReadStandardError.connect(self._on_output)
 
-        # Ensure the QProcess runs in the project directory
-        try:
+        # Set the working directory to the project path
+        if os.path.isdir(self.project_path):
             self.process.setWorkingDirectory(self.project_path)
-        except Exception:
-            pass
 
         env = QProcessEnvironment.systemEnvironment()
 
@@ -166,3 +164,16 @@ class Terminal(QTextEdit):
         # Send command to process
         self.process.write((command + "\n").encode("utf-8"))
         self.ensureCursorVisible()
+
+    def set_project_path(self, new_path: str):
+        """Update the project path and change directory in the terminal."""
+        if not os.path.isdir(new_path):
+            return
+        
+        self.project_path = new_path
+        self.prompt = f"{self.project_path} $ " if os.name != "nt" else f"{self.project_path}> "
+        
+        # Send cd command to change directory in the terminal
+        if self.process.state() == QProcess.ProcessState.Running:
+            cd_command = f"cd \"{new_path}\"" if os.name == "nt" else f"cd '{new_path}'"
+            self.execute_command(cd_command)
