@@ -124,6 +124,13 @@ class PyCursorMain(QMainWindow):
         if folder:
             self._update_last_open_folder(folder)
             self.project_path = folder
+            
+            # Update all terminal tabs to the new project path
+            for i in range(self.terminal_tabs.count()):
+                terminal = self.terminal_tabs.widget(i)
+                if terminal and hasattr(terminal, 'set_project_path'):
+                    terminal.set_project_path(folder)
+            
             try:
                 if hasattr(self.sidebar, "setRootPath"):
                     self.sidebar.setRootPath(folder)
@@ -298,7 +305,7 @@ class PyCursorMain(QMainWindow):
             QMessageBox.information(self, "Executing", f"Running: python \"{file_path}\"")
 
     def add_terminal_tab(self, name="Terminal"):
-        term = Terminal()
+        term = Terminal(project_path=self.project_path)
         self.terminal_tabs.addTab(term, name)
 
 
