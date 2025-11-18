@@ -184,26 +184,8 @@ class AIEngine(QWidget):
             self.api_local_btn.setIcon(self.local_icon)
             self.api_local_btn.setToolTip("Using Local models")
 
-    def handle_send(self):
-        user_input = self.input_field.text().strip()
-        if not user_input:
-            return
-
-        self.chat_area.append(f"<b>User:</b> {user_input}")
-        self.input_field.clear()
-
-        if self.using_api:
-            model_identifier = next(iter(self.models.values()), "default")
-            response = self.api_model_response(user_input, model_identifier)
-        else:
-            response = self.local_model_handler.local_model_response(user_input)
-
-        self.chat_area.append(f"<b>AI:</b> {response}\n")
-        self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
-
     def api_model_response(self, prompt, model_identifier):
         return f"[API response from {model_identifier}]"
-    
     
     def set_main_window(self, main_window):
         self.main_window = main_window
@@ -216,20 +198,16 @@ class AIEngine(QWidget):
                 return resp
 
             if hasattr(resp, "__iter__") and not isinstance(resp, (dict, bytes)):
-                collected = []
+                buffer = []
                 for chunk in resp:
-                    try:
-                        collected.append(str(chunk))
-                    except Exception:
-                        collected.append(repr(chunk))
-                return "".join(collected)
+                    if hasattr(chunk, "text"):
+                        buffer.append(chunk.text)
+                    else:
+                        buffer.append(str(chunk))
+                return "".join(buffer)
 
             return str(resp)
-        except TypeError:
-            try:
-                return str(self.local_model_handler.local_model_response(prompt))
-            except Exception as e:
-                return f"[AI Error] {e}"
+
         except Exception as e:
             return f"[AI Error] {e}"
 
@@ -250,93 +228,83 @@ class AIEngine(QWidget):
         else:
             response = self.run_model(user_input)
 
-        self.chat_area.append(f"<b>AI:</b> {response}\n")
-        self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
+        print("Model Response:", response)
 
         if self._contains_edit_tags(response):
             try:
                 self.apply_response_to_editor(response)
+                self.chat_area.append("<i>[AI wrote changes to the editor]</i>")
             except Exception as e:
-                self.chat_area.append(f"<i>[Failed to apply response to file: {e}]</i>")
+                self.chat_area.append(f"<i>[Failed to apply response to editor: {e}]</i>")
+            return
+
+        self.chat_area.append(f"<b>AI:</b> {response}\n")
+        self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
 
     def apply_response_to_editor(self, response: str):
-        edit_start = response.find("<<<edit>>>")
-        edit_end = response.find("<</edit>>")
-        
-        if edit_start != -1 and edit_end != -1:
-            edit_start += len("<<<edit>>>")
-            extracted_content = response[edit_start:edit_end].strip()
+        print("Full AI Response:\n", repr(response))
+
+        if "<<<edit>>>" in response and "<</edit>>>" in response:
+            start = response.find("<<<edit>>>") + len("<<<edit>>>")
+            end = response.find("<</edit>>")
+
+            extracted = response[start:end].strip()
+            print("Extracted Code to Apply:\n", repr(extracted))
         else:
-            extracted_content = response
-        
-        if not extracted_content:
-            self.chat_area.append(f"<i>[No content to write to file]</i>")
+            extracted = response.strip()
+
+        if not extracted:
+            self.chat_area.append("<i>[No content extracted]</i>")
             return
 
-        if not hasattr(self, "main_window") or self.main_window is None:
-            project_root = os.getcwd()
-            filename = f"ai_output_{int(time.time())}.txt"
-            full_path = os.path.join(project_root, filename)
-
-            with open(full_path, "a", encoding="utf-8") as f:
-                before_lines = 0
-                f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
-                added_lines = len(extracted_content.splitlines())
-            self.chat_area.append(f"<i>[Wrote {added_lines} lines to {filename}]</i>")
+        if not hasattr(self, "main_window"):
+            self.chat_area.append("<i>[No main window attached]</i>")
             return
 
-        editor = None
         try:
             editor = self.main_window.get_current_editor()
         except Exception:
             editor = None
 
         if editor is None:
-            project_root = getattr(self.main_window, "project_path", os.getcwd())
-            filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
-            full_path = os.path.join(project_root, filename)
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
-            added_lines = len(extracted_content.splitlines())
-            try:
-                self.main_window.notify_lines_added(filename, added_lines)
-            except Exception:
-                self.chat_area.append(f"<i>[Created {filename} ({added_lines} lines)]</i>")
+            self.chat_area.append("<i>[No active editor, writing to fallback file]</i>")
             return
+
+        if hasattr(editor, "toPlainText"):
+            current = editor.toPlainText()
+        elif hasattr(editor, "text"):
+            current = editor.text()
+        elif hasattr(editor, "get_text"):
+            current = editor.get_text()
+        else:
+            raise AttributeError("Editor has no method to get text")
+
+        if current is None:
+            current = ""
+
+        if current and not current.endswith("\n"):
+            new_content = current + "\n" + extracted
+        else:
+            new_content = current + extracted
+
+        print("New Content to Apply to Editor:\n", repr(new_content))
+
+        if hasattr(editor, "setPlainText"):
+            editor.setPlainText(new_content)
+        elif hasattr(editor, "set_text"):
+            editor.set_text(new_content)
+        elif hasattr(editor, "setText"):
+            editor.setText(new_content)
+        else:
+            raise AttributeError("Editor has no method to set text")
 
         file_path = getattr(editor, "file_path", None)
         if file_path:
-            try:
-                current_content = editor.toPlainText()
-                
-                if current_content and not current_content.endswith("\n"):
-                    new_content = current_content + "\n" + extracted_content
-                else:
-                    new_content = current_content + extracted_content
-                
-                if not new_content.endswith("\n"):
-                    new_content += "\n"
-                
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(new_content)
-                
-                editor.setPlainText(new_content)
-                
-                added_lines = len(extracted_content.splitlines())
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
 
-                self.main_window.notify_lines_added(os.path.basename(file_path), added_lines)
-            except Exception as e:
-                raise
-        else:
-            project_root = getattr(self.main_window, "project_path", os.getcwd())
-            filename = f"ai_output_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.py"
-            full_path = os.path.join(project_root, filename)
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(extracted_content if extracted_content.endswith("\n") else extracted_content + "\n")
-            added_lines = len(extracted_content.splitlines())
-            if hasattr(self.main_window, "open_file_in_tab"):
-                self.main_window.open_file_in_tab(full_path)
-            self.main_window.notify_lines_added(filename, added_lines)
+        added_lines = len(extracted.splitlines())
+        self.chat_area.append(f"<i>[AI added {added_lines} lines]</i>")
 
 
 if __name__ == "__main__":
