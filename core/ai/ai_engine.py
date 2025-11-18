@@ -18,7 +18,6 @@ class AIEngine(QWidget):
         self.setWindowTitle("AI Assistant")
         self.resize(600, 800)
 
-        self.system_prompt = "You are a helpful AI assistant."
         self.chunk_size = 500
 
         self.send_icon = load_icon("send.png")
@@ -212,7 +211,7 @@ class AIEngine(QWidget):
             return f"[AI Error] {e}"
 
     def _contains_edit_tags(self, response: str) -> bool:
-        return "<<<edit>>>" in response and "<</edit>>" in response
+        return "<<<edit>>>" in response and "<<</edit>>>" in response
 
     def handle_send(self):
         user_input = self.input_field.text().strip()
@@ -244,9 +243,9 @@ class AIEngine(QWidget):
     def apply_response_to_editor(self, response: str):
         print("Full AI Response:\n", repr(response))
 
-        if "<<<edit>>>" in response and "<</edit>>>" in response:
+        if "<<<edit>>>" in response and "<<</edit>>>" in response:
             start = response.find("<<<edit>>>") + len("<<<edit>>>")
-            end = response.find("<</edit>>")
+            end = response.find("<<</edit>>>")
 
             extracted = response[start:end].strip()
             print("Extracted Code to Apply:\n", repr(extracted))
