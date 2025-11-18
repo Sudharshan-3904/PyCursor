@@ -156,12 +156,10 @@ class SideBar(QWidget):
             if not path:
                 return
             self.root_path = path
-            # update label text
             try:
                 self.dir_label.setText(os.path.basename(self.root_path) or self.root_path)
             except Exception:
                 pass
-            # update QFileSystemModel root and refresh tree view
             try:
                 self.model.setRootPath(self.root_path)
             except Exception:

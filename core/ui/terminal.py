@@ -31,7 +31,6 @@ class Terminal(QTextEdit):
         self.process.readyReadStandardOutput.connect(self._on_output)
         self.process.readyReadStandardError.connect(self._on_output)
 
-        # Set the working directory to the project path
         if os.path.isdir(self.project_path):
             self.process.setWorkingDirectory(self.project_path)
 
@@ -48,7 +47,6 @@ class Terminal(QTextEdit):
 
         self.process.setProcessEnvironment(env)
 
-        # Start the shell with sensible args per-platform so it stays interactive
         shell_prog = self.shell
         shell_args = []
         if platform.system() == "Windows":
@@ -62,7 +60,6 @@ class Terminal(QTextEdit):
             if base in ("bash", "zsh", "sh"):
                 shell_args = ["-i"]
 
-        # Start and ensure it started
         if shell_args:
             self.process.start(shell_prog, shell_args)
         else:
@@ -106,14 +103,11 @@ class Terminal(QTextEdit):
         self.setTextCursor(cursor)
 
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            # Extract the user's typed command from the last line.
-            # Be robust against prompt formatting differences (with/without trailing space).
             last_line = self.toPlainText().split("\n")[-1]
             cmd = last_line
             if self.prompt and self.prompt in last_line:
                 cmd = last_line.replace(self.prompt, "", 1)
             else:
-                # Try to find common prompt separators and take text after them
                 for sep in (">", "$", ":"):
                     idx = last_line.rfind(sep)
                     if idx != -1:
@@ -121,9 +115,6 @@ class Terminal(QTextEdit):
                         break
 
             cmd = cmd.strip()
-            # Handle local clear commands: these don't emit output from the
-            # shell when running under a GUI process, so clear the widget
-            # locally instead of sending to the shell.
             if cmd and cmd.lower() in ("cls", "clear"):
                 self.clear()
                 self.append(self.prompt)
@@ -151,17 +142,14 @@ class Terminal(QTextEdit):
         if not self.process.state() == QProcess.ProcessState.Running:
             return
         
-        # Move cursor to end and add command
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         self.setTextCursor(cursor)
         
-        # Add visual separator
         self.append("\n" + "="*75)
         self.append(f">>> Executing: {command}")
         self.append("="*75 + "\n")
         
-        # Send command to process
         self.process.write((command + "\n").encode("utf-8"))
         self.ensureCursorVisible()
 
@@ -173,7 +161,6 @@ class Terminal(QTextEdit):
         self.project_path = new_path
         self.prompt = f"{self.project_path} $ " if os.name != "nt" else f"{self.project_path}> "
         
-        # Send cd command to change directory in the terminal
         if self.process.state() == QProcess.ProcessState.Running:
             cd_command = f"cd \"{new_path}\"" if os.name == "nt" else f"cd '{new_path}'"
             self.execute_command(cd_command)

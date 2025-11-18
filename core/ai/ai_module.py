@@ -1,16 +1,15 @@
 from __future__ import annotations
 import os
-import json
 from dataclasses import dataclass
 from difflib import SequenceMatcher, unified_diff
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QTextCursor, QAction
+from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
+    QDialog, QHBoxLayout, QLabel,
     QMessageBox, QPushButton, QSplitter, QTextEdit, QVBoxLayout, QWidget,
-    QPlainTextEdit, QCheckBox, QScrollArea, QSizePolicy, QInputDialog
+    QCheckBox, QScrollArea, QSizePolicy
 )
 
 try:

@@ -5,13 +5,10 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QObject, pyqtSignal, QTimer
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from core import app_main
-
 from core.ui.editor import CodeEditor
-from core.ui.terminal import Terminal
-from core.ui.sidebar import SideBar
 
 
 class ReloadSignals(QObject):

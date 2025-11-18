@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (
-    QMainWindow, QSplitter, QWidget, QVBoxLayout, QFileDialog, QMenuBar, QApplication
+    QMainWindow, QSplitter, QWidget, QVBoxLayout, QFileDialog, QMenuBar
 )
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
@@ -81,5 +81,10 @@ class MainWindow(QMainWindow):
                 llm_client.config["model_name"] = model_name
                 llm_client.config["backend"] = backend
                 self.statusBar().showMessage(f"Switched model to {model_name} ({backend})", 3000)
+
+            self.editor.clear()
+            self.current_file_path = None
+            self.statusBar().showMessage(f"Editor cleared due to model change", 3000)
+
         except Exception as e:
             print("Failed to switch AI model:", e)
