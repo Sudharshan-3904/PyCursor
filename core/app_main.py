@@ -3,16 +3,18 @@ import os
 import json
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QDockWidget, QTabWidget, QFileDialog,
-    QMessageBox, QTabBar, QPushButton, QWidget, QLabel, QVBoxLayout
+    QMessageBox, QTabBar, QPushButton, QWidget, QLabel, QVBoxLayout,
+    QHBoxLayout, QStatusBar, QToolBar, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt, QTimer, QSize
+from PyQt6.QtGui import QAction, QIcon, QFont
 
 from core.ui.sidebar import SideBar
 from core.ui.editor import CodeEditor
 from core.ui.terminal import Terminal
 from core.ai.ai_engine import AIEngine
 from core.utils import load_icon
+from core.ui.theme import get_stylesheet, COLORS
 
 
 
@@ -20,7 +22,9 @@ class PyCursorMain(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PyCursor IDE")
-        self.resize(1200, 800)
+        self.resize(1400, 900)
+        
+        self.setStyleSheet(get_stylesheet())
 
         self.settings_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
@@ -31,69 +35,266 @@ class PyCursorMain(QMainWindow):
 
         self.editor_tabs = QTabWidget()
         self.editor_tabs.setTabsClosable(True)
+        self.editor_tabs.setMovable(True)
+        self.editor_tabs.setDocumentMode(True)
         self.editor_tabs.tabCloseRequested.connect(self.close_editor_tab)
         self.setCentralWidget(self.editor_tabs)
 
-        self.sidebar = SideBar()
+        self.sidebar = SideBar(root_path=self.project_path)
         self.sidebar.file_selected.connect(self.open_file_in_tab)
 
-        self.sidebar_dock = QDockWidget("Explorer", self)
+        self.sidebar_dock = QDockWidget("EXPLORER", self)
         self.sidebar_dock.setWidget(self.sidebar)
         self.sidebar_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea)
+        self.sidebar_dock.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.sidebar_dock)
 
         self.ai_widget = AIEngine()
         self.ai_widget.set_main_window(self)
 
-        self.ai_dock = QDockWidget("AI Assistant", self)
+        self.ai_dock = QDockWidget("AI ASSISTANT", self)
         self.ai_dock.setWidget(self.ai_widget)
         self.ai_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea)
+        self.ai_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable | QDockWidget.DockWidgetFeature.DockWidgetMovable)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ai_dock)
 
-        self.status_dock = QDockWidget("Status", self)
-        status_widget = QWidget()
-        status_layout = QVBoxLayout()
-        status_layout.setContentsMargins(6, 6, 6, 6)
-        self.right_status_label = QLabel("Ready")
-        status_layout.addWidget(self.right_status_label)
-        status_layout.addStretch()
-        status_widget.setLayout(status_layout)
-        self.status_dock.setWidget(status_widget)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.status_dock)
-
         self.terminal_tabs = QTabWidget()
+        self.terminal_tabs.setTabsClosable(False)
+        self.terminal_tabs.setMovable(True)
         self.add_terminal_tab("Terminal 1")
 
-        self.terminal_dock = QDockWidget("Terminal", self)
+        self.terminal_dock = QDockWidget("TERMINAL", self)
         self.terminal_dock.setWidget(self.terminal_tabs)
         self.terminal_dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea)
+        self.terminal_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable | QDockWidget.DockWidgetFeature.DockWidgetMovable)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal_dock)
 
+        self.create_activity_bar()
+
+        self.create_status_bar()
+        
         self.create_menu_bar()
+
+    def create_activity_bar(self):
+        """Create VS Code-style Activity Bar using QToolBar"""
+        activity_bar = QToolBar("Activity Bar")
+        activity_bar.setMovable(False)
+        activity_bar.setFloatable(False)
+        activity_bar.setOrientation(Qt.Orientation.Vertical)
+        activity_bar.setIconSize(QSize(28, 28))
+        activity_bar.setStyleSheet(f"""
+            QToolBar {{
+                background-color: {COLORS['bg_secondary']};
+                border-right: 1px solid {COLORS['border']};
+                spacing: 10px;
+                padding: 10px 0px;
+            }}
+            QToolButton {{
+                background-color: transparent;
+                border: none;
+                border-left: 2px solid transparent;
+                padding: 8px;
+                border-radius: 0px;
+            }}
+            QToolButton:hover {{
+                background-color: {COLORS['bg_tertiary']};
+            }}
+            QToolButton:checked {{
+                border-left: 2px solid {COLORS['accent_blue']};
+                background-color: {COLORS['bg_tertiary']};
+            }}
+        """)
+        
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, activity_bar)
+        
+        explorer_action = QAction(load_icon("folder.svg"), "Explorer", self)
+        explorer_action.setCheckable(True)
+        explorer_action.setChecked(True)
+        explorer_action.triggered.connect(lambda: self.toggle_view("explorer"))
+        activity_bar.addAction(explorer_action)
+        self.explorer_action = explorer_action
+        
+        search_action = QAction(load_icon("search.svg"), "Search", self)
+        search_action.setCheckable(True)
+        search_action.triggered.connect(lambda: self.toggle_view("search"))
+        activity_bar.addAction(search_action)
+        self.search_action = search_action
+        
+        git_action = QAction(load_icon("git.svg"), "Source Control", self)
+        git_action.setCheckable(True)
+        git_action.triggered.connect(lambda: self.toggle_view("git"))
+        activity_bar.addAction(git_action)
+        self.git_action = git_action
+        
+        ai_action = QAction(load_icon("ai_chat.svg"), "AI Assistant", self)
+        ai_action.setCheckable(True)
+        ai_action.setChecked(True)
+        ai_action.triggered.connect(lambda: self.toggle_view("ai"))
+        activity_bar.addAction(ai_action)
+        self.ai_action = ai_action
+
+        empty = QWidget()
+        empty.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        activity_bar.addWidget(empty)
+
+        settings_action = QAction(load_icon("settings.svg"), "Settings", self)
+        settings_action.triggered.connect(self.open_settings)
+        activity_bar.addAction(settings_action)
+
+    def open_settings(self):
+        from core.ui.settings_dialog import SettingsDialog
+        dialog = SettingsDialog(self, api_handler=self.ai_widget.api_model_handler)
+        dialog.exec()
+
+    def toggle_view(self, view_name):
+        """Handle Activity Bar clicks"""
+        if view_name == "explorer":
+            visible = self.sidebar_dock.isVisible()
+            if visible and self.explorer_action.isChecked():
+                pass
+            
+            self.sidebar_dock.setVisible(self.explorer_action.isChecked())
+            
+        elif view_name == "ai":
+            self.ai_dock.setVisible(self.ai_action.isChecked())
+            
+        elif view_name in ["search", "git"]:
+            pass
+    
+    def create_status_bar(self):
+        """Create VS Code-style status bar"""
+        status_bar = QStatusBar()
+        self.setStatusBar(status_bar)
+        
+        self.status_file_label = QLabel("No file open")
+        self.status_file_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
+        status_bar.addWidget(self.status_file_label)
+        
+        status_bar.addWidget(QLabel("|"))
+        
+        self.status_cursor_label = QLabel("Ln 1, Col 1")
+        self.status_cursor_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
+        status_bar.addWidget(self.status_cursor_label)
+        
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        status_bar.addWidget(spacer)
+        
+        self.status_language_label = QLabel("Python")
+        self.status_language_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
+        status_bar.addWidget(self.status_language_label)
+        
+        status_bar.addWidget(QLabel("|"))
+        
+        self.status_encoding_label = QLabel("UTF-8")
+        self.status_encoding_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
+        status_bar.addWidget(self.status_encoding_label)
+        
+        status_bar.addWidget(QLabel("|"))
+        
+        self.status_git_label = QLabel("main")
+        self.status_git_label.setStyleSheet(f"color: {COLORS['accent_blue']}; padding: 0 10px;")
+        status_bar.addWidget(self.status_git_label)
+        
+        self.editor_tabs.currentChanged.connect(self.update_status_bar)
 
     def create_menu_bar(self):
         menu_bar = self.menuBar()
+        file_menu = menu_bar.addMenu("&File")
 
-        file_menu = menu_bar.addMenu("File")
-
-        open_action = QAction("Open File", self)
+        open_action = QAction("&Open File...", self)
+        open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.open_file_dialog)
 
-        open_folder_action = QAction("Open Folder", self)
+        open_folder_action = QAction("Open &Folder...", self)
+        open_folder_action.setShortcut("Ctrl+K Ctrl+O")
         open_folder_action.triggered.connect(self.open_folder_dialog)
 
-        save_action = QAction("Save File", self)
+        save_action = QAction("&Save", self)
+        save_action.setShortcut("Ctrl+S")
         save_action.triggered.connect(self.save_file)
+        
+        save_as_action = QAction("Save &As...", self)
+        save_as_action.setShortcut("Ctrl+Shift+S")
+        save_as_action.triggered.connect(lambda: self.save_file(save_as=True))
 
         file_menu.addAction(open_action)
         file_menu.addAction(open_folder_action)
+        file_menu.addSeparator()
         file_menu.addAction(save_action)
+        file_menu.addAction(save_as_action)
+        file_menu.addSeparator()
+        
+        close_tab_action = QAction("&Close Tab", self)
+        close_tab_action.setShortcut("Ctrl+W")
+        close_tab_action.triggered.connect(lambda: self.close_editor_tab(self.editor_tabs.currentIndex()))
+        file_menu.addAction(close_tab_action)
 
-        run_menu = menu_bar.addMenu("Run")
-        run_action = QAction("Run Code", self)
+        edit_menu = menu_bar.addMenu("&Edit")
+        
+        undo_action = QAction("&Undo", self)
+        undo_action.setShortcut("Ctrl+Z")
+        edit_menu.addAction(undo_action)
+        
+        redo_action = QAction("&Redo", self)
+        redo_action.setShortcut("Ctrl+Y")
+        edit_menu.addAction(redo_action)
+        
+        edit_menu.addSeparator()
+        
+        find_action = QAction("&Find", self)
+        find_action.setShortcut("Ctrl+F")
+        edit_menu.addAction(find_action)
+        
+        replace_action = QAction("&Replace", self)
+        replace_action.setShortcut("Ctrl+H")
+        edit_menu.addAction(replace_action)
+
+        view_menu = menu_bar.addMenu("&View")
+        
+        toggle_sidebar_action = QAction("Toggle &Explorer", self)
+        toggle_sidebar_action.setShortcut("Ctrl+B")
+        toggle_sidebar_action.triggered.connect(lambda: self.sidebar_dock.setVisible(not self.sidebar_dock.isVisible()))
+        view_menu.addAction(toggle_sidebar_action)
+        
+        toggle_terminal_action = QAction("Toggle &Terminal", self)
+        toggle_terminal_action.setShortcut("Ctrl+`")
+        toggle_terminal_action.triggered.connect(lambda: self.terminal_dock.setVisible(not self.terminal_dock.isVisible()))
+        view_menu.addAction(toggle_terminal_action)
+        
+        toggle_ai_action = QAction("Toggle &AI Assistant", self)
+        toggle_ai_action.setShortcut("Ctrl+Shift+A")
+        toggle_ai_action.triggered.connect(lambda: self.ai_dock.setVisible(not self.ai_dock.isVisible()))
+        view_menu.addAction(toggle_ai_action)
+
+        run_menu = menu_bar.addMenu("&Run")
+        run_action = QAction("&Run Code", self)
         run_action.setShortcut("Ctrl+Shift+R")
         run_action.triggered.connect(self.execute_current_file)
         run_menu.addAction(run_action)
+    
+    def update_status_bar(self):
+        """Update status bar with current file info"""
+        editor = self.get_current_editor()
+        if editor and hasattr(editor, 'file_path'):
+            filename = os.path.basename(editor.file_path)
+            self.status_file_label.setText(filename)
+            
+            ext = os.path.splitext(filename)[1].lower()
+            lang_map = {
+                '.py': 'Python',
+                '.js': 'JavaScript',
+                '.ts': 'TypeScript',
+                '.html': 'HTML',
+                '.css': 'CSS',
+                '.json': 'JSON',
+                '.md': 'Markdown',
+                '.txt': 'Plain Text'
+            }
+            self.status_language_label.setText(lang_map.get(ext, 'Unknown'))
+        else:
+            self.status_file_label.setText("No file open")
+            self.status_language_label.setText("—")
 
     def open_file_dialog(self):
         start_dir = self.project_path or os.getcwd()

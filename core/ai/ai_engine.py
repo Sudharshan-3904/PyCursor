@@ -4,13 +4,18 @@ import time
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QMenu,
-    QTextEdit, QPushButton, QLineEdit, QInputDialog
+    QTextEdit, QPushButton, QLineEdit, QInputDialog, QMessageBox
 )
 from PyQt6.QtGui import QAction
 
 from ..utils import load_icon
 from .local_model_handler import LocalModelHandler
+from .api_model_handler import APIModelHandler, APIConfig
+from .docstring_generator import DocstringGenerator
+from .code_linter import CodeLinter
 
+
+from core.ui.theme import COLORS
 
 class AIEngine(QWidget):
     def __init__(self):
@@ -33,17 +38,17 @@ class AIEngine(QWidget):
             "lmstudio" if self.current_model_name and self.current_model_name.startswith("LM Studio") else "ollama"
         )
 
-        self.models = self.local_model_handler.detect_models()
-
-        self.current_model_name = next(iter(self.models.keys()), None)
-        self.current_backend = (
-            "lmstudio" if self.current_model_name and self.current_model_name.startswith("LM Studio") else "ollama"
-        )
-
         self.local_model_handler.backend = self.current_backend
         self.local_model_handler.model_name = (
             self.current_model_name.split(": ", 1)[-1] if self.current_model_name else None
         )
+
+        self.api_model_handler = APIModelHandler()
+        self.api_config = None
+        
+        self.docstring_generator = DocstringGenerator(style='google')
+        
+        self.code_linter = CodeLinter()
 
         self.using_api = False
 
@@ -57,12 +62,36 @@ class AIEngine(QWidget):
         self.chat_area = QTextEdit()
         self.chat_area.setReadOnly(True)
         self.chat_area.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.chat_area.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {COLORS['editor_bg']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 8px;
+            }}
+        """)
         main_layout.addWidget(self.chat_area)
 
         self.input_field = QLineEdit()
         self.input_field.setPlaceholderText("Type your message here...")
         self.input_field.returnPressed.connect(self.handle_send)
+        self.input_field.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 8px;
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {COLORS['border_focus']};
+                background-color: {COLORS['bg_primary']};
+            }}
+        """)
         main_layout.addWidget(self.input_field)
+
+
 
         toolbar_layout = QHBoxLayout()
         toolbar_layout.setSpacing(5)
@@ -184,7 +213,15 @@ class AIEngine(QWidget):
             self.api_local_btn.setToolTip("Using Local models")
 
     def api_model_response(self, prompt, model_identifier):
-        return f"[API response from {model_identifier}]"
+        """Generate response using API models"""
+        if not self.api_config:
+            return "[Error: API not configured. Please configure API settings first.]"
+        
+        try:
+            response = self.api_model_handler.generate_response(prompt)
+            return response
+        except Exception as e:
+            return f"[API Error: {e}]"
     
     def set_main_window(self, main_window):
         self.main_window = main_window
@@ -304,6 +341,185 @@ class AIEngine(QWidget):
 
         added_lines = len(extracted.splitlines())
         self.chat_area.append(f"<i>[AI added {added_lines} lines]</i>")
+    
+    def configure_api(self, provider: str):
+        """
+        Configure API settings for a provider
+        
+        Args:
+            provider: 'openai', 'anthropic', or 'gemini'
+        """
+        from PyQt6.QtWidgets import QDialog, QFormLayout, QComboBox, QDialogButtonBox
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Configure {provider.title()} API")
+        dialog.resize(400, 200)
+        
+        layout = QFormLayout()
+        
+        api_key_input = QLineEdit()
+        api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        api_key_input.setPlaceholderText("Enter API key or leave empty to use environment variable")
+        layout.addRow("API Key:", api_key_input)
+        
+        model_combo = QComboBox()
+        models = APIModelHandler.get_available_models(provider)
+        model_combo.addItems(models)
+        layout.addRow("Model:", model_combo)
+        
+        temp_input = QLineEdit("0.7")
+        layout.addRow("Temperature:", temp_input)
+        
+        tokens_input = QLineEdit("2000")
+        layout.addRow("Max Tokens:", tokens_input)
+        
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addRow(buttons)
+        
+        dialog.setLayout(layout)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            api_key = api_key_input.text().strip()
+            if not api_key:
+                api_key = APIModelHandler.load_api_key_from_env(provider)
+            
+            if not api_key:
+                QMessageBox.warning(self, "API Key Required", 
+                                  f"No API key provided and none found in environment variable")
+                return
+            
+            try:
+                self.api_config = APIConfig(
+                    provider=provider,
+                    api_key=api_key,
+                    model_name=model_combo.currentText(),
+                    temperature=float(temp_input.text()),
+                    max_tokens=int(tokens_input.text())
+                )
+                self.api_model_handler.set_config(self.api_config)
+                self.chat_area.append(f"<i>[API configured: {provider} - {model_combo.currentText()}]</i>")
+            except Exception as e:
+                QMessageBox.critical(self, "Configuration Error", f"Failed to configure API: {e}")
+    
+    def generate_docstring_for_current_code(self):
+        """Generate docstring for code in current editor"""
+        if not hasattr(self, 'main_window'):
+            self.chat_area.append("<i>[No main window attached]</i>")
+            return
+        
+        try:
+            editor = self.main_window.get_current_editor()
+            if editor is None:
+                self.chat_area.append("<i>[No active editor]</i>")
+                return
+            
+            if hasattr(editor, 'toPlainText'):
+                code = editor.toPlainText()
+            elif hasattr(editor, 'text'):
+                code = editor.text()
+            else:
+                self.chat_area.append("<i>[Cannot read editor content]</i>")
+                return
+            
+            missing = self.docstring_generator.find_missing_docstrings(code)
+            
+            if not missing:
+                self.chat_area.append("<i>[All functions and classes have docstrings!]</i>")
+                return
+            
+            self.chat_area.append(f"<b>Found {len(missing)} items missing docstrings:</b>")
+            for item in missing:
+                self.chat_area.append(f"  - {item['type']}: {item['name']} (line {item['line']})")
+            
+            analysis = self.docstring_generator.analyze_code(code)
+            
+            if analysis['functions']:
+                func = analysis['functions'][0]
+                docstring = self.docstring_generator.generate_function_docstring(func)
+                self.chat_area.append(f"\n<b>Example docstring for {func.name}:</b>\n{docstring}")
+            
+        except Exception as e:
+            self.chat_area.append(f"<i>[Error generating docstrings: {e}]</i>")
+    
+    def explain_lint_errors(self):
+        """Run linter and explain errors using AI"""
+        if not hasattr(self, 'main_window'):
+            self.chat_area.append("<i>[No main window attached]</i>")
+            return
+        
+        try:
+            editor = self.main_window.get_current_editor()
+            if editor is None:
+                self.chat_area.append("<i>[No active editor]</i>")
+                return
+            
+            file_path = getattr(editor, 'file_path', None)
+            if not file_path:
+                self.chat_area.append("<i>[No file path available for linting]</i>")
+                return
+            
+            self.chat_area.append("<b>Running code linter...</b>")
+            errors = self.code_linter.lint_file(file_path)
+            
+            if not errors:
+                self.chat_area.append("<i>[No errors found! Code looks good.]</i>")
+                return
+            
+            self.chat_area.append(f"<b>Found {len(errors)} issues:</b>")
+            
+            for error in errors[:5]:
+                self.chat_area.append(f"\n{error}")
+                
+                context = self.code_linter.get_error_context(file_path, error.line)
+                if context:
+                    self.chat_area.append(f"<pre>{context}</pre>")
+            
+            if len(errors) > 5:
+                self.chat_area.append(f"\n<i>[... and {len(errors) - 5} more issues]</i>")
+            
+        except Exception as e:
+            self.chat_area.append(f"<i>[Error running linter: {e}]</i>")
+    
+    def refactor_code(self, instruction: str):
+        """Refactor code based on instruction"""
+        if not hasattr(self, 'main_window'):
+            return
+        
+        try:
+            editor = self.main_window.get_current_editor()
+            if editor is None:
+                return
+            
+            if hasattr(editor, 'toPlainText'):
+                code = editor.toPlainText()
+            else:
+                return
+            
+            prompt = f"""Refactor this Python code according to the instruction: {instruction}
+
+Current code:
+```python
+{code}
+```
+
+Please provide the refactored code wrapped in <<<edit>>> tags.
+"""
+            
+            if self.using_api and self.api_config:
+                response = self.api_model_handler.generate_response(prompt)
+            else:
+                response = self.run_model(prompt)
+            
+            if self._contains_edit_tags(response):
+                self.apply_response_to_editor(response)
+                self.chat_area.append("<i>[Code refactored successfully]</i>")
+            else:
+                self.chat_area.append(f"<b>Refactoring suggestion:</b>\n{response}")
+                
+        except Exception as e:
+            self.chat_area.append(f"<i>[Error refactoring code: {e}]</i>")
 
 
 if __name__ == "__main__":
