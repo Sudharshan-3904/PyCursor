@@ -24,3 +24,17 @@ def load_icon(name: str, size=20, recolor_to_white=True) -> QIcon:
         return QIcon(white_pixmap)
 
     return QIcon(pixmap)
+
+
+def load_systemPrompt(filename: str = "generalPrompt.txt") -> str:
+    text_file_name = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "systemPrompts", filename))
+
+    try:
+        with open(text_file_name, 'r') as f:
+            data = f.read()
+        
+        return data
+
+    except FileNotFoundError:
+        print(f"[Prompt Warning] Missing Prompt file: {text_file_name}")
+        return "You are a helpul coding assistant. Provide cide ot explanations of code the user sends."

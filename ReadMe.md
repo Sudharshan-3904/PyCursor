@@ -27,19 +27,22 @@ It combines the flexibility of a modern code editor with the intelligence of Lar
 - Real-time error highlighting and linting
 - Tab-based file management
 
-### 🤖 Extensive LLM Support (⏳ Planned)
+### 🤖 Extensive LLM Support (✅ Completed)
 
 - **Dual AI Integration**:
 
-  - **Local LLMs:** Run open models (like _LLaMA 3_, _Mistral_, _Phi-3_, etc.) locally.
-  - **API LLMs:** Connect to OpenAI, Anthropic, Gemini, or custom API endpoints.
+  - **Local LLMs:** Run open models (like _LLaMA 3_, _Mistral_, _Phi-3_, etc.) locally via Ollama or LM Studio.
+  - **API LLMs:** Full support for OpenAI, Anthropic Claude, and Google Gemini with easy configuration.
 
 - **Intelligent features**:
 
   - Code completion & generation
   - Code explanation and refactoring
   - Inline chat with the model
-  - AI-powered documentation and debugging
+  - **AI-powered docstring generation** (Google, NumPy, Sphinx, PEP 257 styles)
+  - **Integrated linting with error explanations** (pyflakes, mypy, ruff, pylint, flake8)
+  - **Debug hints and AI-powered error fixes**
+  - Diff-based code application with selective hunk acceptance
 
 ### 🧰 Full IDE Functionality
 
@@ -132,7 +135,7 @@ PyCursor/
 | ----- | ----------------------------- | -------------- |
 | 1     | Core Editor & Layout          | ✅ Completed   |
 | 2     | Editor Intelligence & UX      | ✅ Completed   |
-| 3     | LLM & AI Integration          | ⏳ Planned     |
+| 3     | LLM & AI Integration          | ✅ Completed   |
 | 4     | Git & GitHub Integration      | ⏳ Planned     |
 | 5     | Environment Management        | ⏳ Planned     |
 | 6     | Multi-language Support        | ⏳ Planned     |

@@ -8,3 +8,8 @@ pyqt6-webengine
 watchdog
 langchain_ollama
 langchain_core
+anthropic
+google-generativeai
+pyflakes
+mypy
+ruff
