@@ -4,7 +4,7 @@ import json
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QDockWidget, QTabWidget, QFileDialog,
     QMessageBox, QTabBar, QPushButton, QWidget, QLabel, QVBoxLayout,
-    QHBoxLayout, QStatusBar, QToolBar, QSizePolicy
+    QHBoxLayout, QStatusBar, QToolBar, QSizePolicy, QStackedWidget
 )
 from PyQt6.QtCore import Qt, QTimer, QSize
 from PyQt6.QtGui import QAction, QIcon, QFont
@@ -16,6 +16,7 @@ from core.ai.ai_engine import AIEngine
 from core.utilities.utils import load_icon
 from core.ui.theme import get_stylesheet, COLORS
 from core.utilities.keybindings import KeyBindingsManager
+from core.git.git_panel import GitPanel
 
 
 class PyCursorMain(QMainWindow):
@@ -40,11 +41,21 @@ class PyCursorMain(QMainWindow):
         self.editor_tabs.tabCloseRequested.connect(self.close_editor_tab)
         self.setCentralWidget(self.editor_tabs)
 
+        # Create Stacked Widget for Sidebar (Explorer, Git, etc.)
+        self.sidebar_stack = QStackedWidget()
+
+        # 1. File Explorer
         self.sidebar = SideBar(root_path=self.project_path)
         self.sidebar.file_selected.connect(self.open_file_in_tab)
+        self.sidebar_stack.addWidget(self.sidebar)
+
+        # 2. Git Panel
+        self.git_panel = GitPanel(repo_path=self.project_path)
+        self.git_panel.file_selected.connect(self.open_file_in_tab)
+        self.sidebar_stack.addWidget(self.git_panel)
 
         self.sidebar_dock = QDockWidget("EXPLORER", self)
-        self.sidebar_dock.setWidget(self.sidebar)
+        self.sidebar_dock.setWidget(self.sidebar_stack)
         self.sidebar_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea)
         self.sidebar_dock.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.sidebar_dock)
@@ -221,10 +232,14 @@ class PyCursorMain(QMainWindow):
             
             if current_action.isChecked():
                 was_active = False
-                if view_name == "explorer" and self.sidebar_dock.isVisible():
-                    was_active = True
-                elif view_name in ["search", "git"]:
-                    was_active = current_action.property("was_active")
+                if self.sidebar_dock.isVisible():
+                    # Check current stack index
+                    current_index = self.sidebar_stack.currentIndex()
+                    if view_name == "explorer" and current_index == 0:
+                        was_active = True
+                    elif view_name == "git" and current_index == 1:
+                        was_active = True
+                    # Search would be index 2
                 
                 if was_active:
                     self.sidebar_dock.setVisible(False)
@@ -237,14 +252,19 @@ class PyCursorMain(QMainWindow):
                             action.setProperty("was_active", False)
                     
                     current_action.setProperty("was_active", True)
+                    self.sidebar_dock.setVisible(True)
+                    
                     if view_name == "explorer":
-                        self.sidebar_dock.setVisible(True)
-                    elif view_name == "search":
-                        self.sidebar_dock.setVisible(False)
-                        current_action.setChecked(False)
+                        self.sidebar_stack.setCurrentIndex(0)
+                        self.sidebar_dock.setWindowTitle("EXPLORER")
                     elif view_name == "git":
-                        self.sidebar_dock.setVisible(False)
-                        current_action.setChecked(False)
+                        self.sidebar_stack.setCurrentIndex(1)
+                        self.sidebar_dock.setWindowTitle("SOURCE CONTROL")
+                        self.git_panel.refresh()
+                    elif view_name == "search":
+                        # self.sidebar_stack.setCurrentIndex(2)
+                        self.sidebar_dock.setWindowTitle("SEARCH")
+                        pass
             else:
                 self.sidebar_dock.setVisible(False)
                 current_action.setProperty("was_active", False)
@@ -421,6 +441,10 @@ class PyCursorMain(QMainWindow):
             self.sidebar.set_root_path(folder)
         elif hasattr(self.sidebar, "refresh"):
             self.sidebar.refresh()
+            
+        # Update Git Panel
+        if hasattr(self, 'git_panel'):
+            self.git_panel.set_repository(folder)
 
         for i in range(self.terminal_tabs.count()):
             term = self.terminal_tabs.widget(i)
@@ -461,6 +485,10 @@ class PyCursorMain(QMainWindow):
 
         editor = CodeEditor()
         editor.file_path = file_path
+        
+        # Connect Git signals
+        editor.git_blame_requested.connect(self.show_git_blame)
+        editor.git_history_requested.connect(self.show_git_history)
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -480,6 +508,34 @@ class PyCursorMain(QMainWindow):
 
         tabbar = self.editor_tabs.tabBar()
         tabbar.setTabButton(idx, QTabBar.ButtonPosition.RightSide, close_btn)
+
+    def show_git_blame(self, file_path: str):
+        """Show Git blame for the file"""
+        if not hasattr(self, 'git_panel') or not self.git_panel.git_handler.repo:
+            QMessageBox.information(self, "Git Info", "Not a git repository.")
+            return
+        
+        blame_data = self.git_panel.git_handler.get_file_blame(file_path)
+        if blame_data:
+            from core.ui.git_dialogs import GitBlameDialog
+            dialog = GitBlameDialog(os.path.basename(file_path), blame_data, self)
+            dialog.exec()
+        else:
+            QMessageBox.information(self, "Git Info", "No blame information available.")
+
+    def show_git_history(self, file_path: str):
+        """Show Git history for the file"""
+        if not hasattr(self, 'git_panel') or not self.git_panel.git_handler.repo:
+            QMessageBox.information(self, "Git Info", "Not a git repository.")
+            return
+            
+        history_data = self.git_panel.git_handler.get_file_history(file_path)
+        if history_data:
+            from core.ui.git_dialogs import GitHistoryDialog
+            dialog = GitHistoryDialog(os.path.basename(file_path), history_data, self)
+            dialog.exec()
+        else:
+            QMessageBox.information(self, "Git Info", "No history available.")
 
     def close_editor_tab(self, index):
         editor = self.editor_tabs.widget(index)
@@ -628,7 +684,6 @@ class PyCursorMain(QMainWindow):
         """Show command palette"""
         from core.ui.command_palette import CommandPalette
         
-        # Build list of available commands
         commands = [
             ("Open File", self.open_file_dialog),
             ("Open Folder", self.open_folder_dialog),
@@ -643,7 +698,6 @@ class PyCursorMain(QMainWindow):
         
         palette = CommandPalette(self, mode="commands", actions=commands)
         
-        # Center the palette on the main window
         parent_geometry = self.geometry()
         palette_geometry = palette.geometry()
         x = parent_geometry.x() + (parent_geometry.width() - palette_geometry.width()) // 2

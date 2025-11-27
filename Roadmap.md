@@ -89,24 +89,22 @@
 
 **Learning Outcomes:**
 
-- Integrating REST API and local models into PyQt6
-- Prompt engineering for coding tasks
 - Async communication in GUI without freezing UI
 - AST parsing for code analysis
 - Multi-provider API abstraction
 
 ---
 
-## **Phase 4: Git & GitHub Integration** ⏳ Planned
+## **Phase 4: Git & GitHub Integration** ✅ Completed
 
 **Goal:** Fully integrate version control.
 
 **Tasks:**
 
-- Commit, push, pull, and branch management in UI.
-- Visual diff viewer for file changes.
-- GitHub authentication and repo cloning.
-- Inline Git blame and history per line.
+- [x] Commit, push, pull, and branch management in UI.
+- [x] Visual diff viewer for file changes.
+- [x] GitHub authentication and repo cloning.
+- [x] Inline Git blame and history per line.
 
 **Learning Outcomes:**
 
@@ -209,7 +207,7 @@
 | 1     | Core Editor & Layout        | ✅ Completed   |
 | 2     | Editor Intelligence & UX    | ✅ Completed   |
 | 3     | LLM Integration             | ✅ Completed   |
-| 4     | Git & GitHub                | ⏳ Planned     |
+| 4     | Git & GitHub                | ✅ Completed   |
 | 5     | Env & Dependency Management | ⏳ Planned     |
 | 6     | Multi-language Support      | ⏳ Planned     |
 | 7     | Plugin System & Theming     | ⏳ Planned     |

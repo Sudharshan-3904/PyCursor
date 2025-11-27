@@ -1,21 +1,13 @@
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtWidgets import QMenu
+from PyQt6.QtGui import QColor, QFont, QAction
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython
-
-
-class CodeEditor(QsciScintilla):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        font = QFont("Consolas", 11)
-        self.setFont(font)
-        self.setMarginsFont(font)
-
-        lexer = QsciLexerPython()
-        lexer.setDefaultFont(font)
-
 from core.ui.theme import COLORS
 
 class CodeEditor(QsciScintilla):
+    git_blame_requested = pyqtSignal(str)
+    git_history_requested = pyqtSignal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -94,3 +86,25 @@ class CodeEditor(QsciScintilla):
             self.setText(existing_text + "\n" + text)
         else:
             self.setText(existing_text + text)
+            
+    def contextMenuEvent(self, event):
+        menu = self.createStandardContextMenu()
+        menu.addSeparator()
+        
+        blame_action = QAction("Git Blame", self)
+        blame_action.triggered.connect(self.request_blame)
+        menu.addAction(blame_action)
+        
+        history_action = QAction("Git History", self)
+        history_action.triggered.connect(self.request_history)
+        menu.addAction(history_action)
+        
+        menu.exec(event.globalPos())
+        
+    def request_blame(self):
+        if hasattr(self, 'file_path') and self.file_path:
+            self.git_blame_requested.emit(self.file_path)
+            
+    def request_history(self):
+        if hasattr(self, 'file_path') and self.file_path:
+            self.git_history_requested.emit(self.file_path)
