@@ -4,7 +4,7 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter
 
 
 def load_icon(name: str, size=20, recolor_to_white=True) -> QIcon:
-    base_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "icons")
+    base_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icons")
     icon_path = os.path.abspath(os.path.join(base_dir, name))
     if not os.path.exists(icon_path):
         print(f"[Icon Warning] Missing icon file: {icon_path}")
@@ -27,7 +27,7 @@ def load_icon(name: str, size=20, recolor_to_white=True) -> QIcon:
 
 
 def load_systemPrompt(filename: str = "generalPrompt.txt") -> str:
-    text_file_name = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "systemPrompts", filename))
+    text_file_name = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "assets", "systemPrompts", filename))
 
     try:
         with open(text_file_name, 'r') as f:

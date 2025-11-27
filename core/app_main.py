@@ -13,9 +13,9 @@ from core.ui.sidebar import SideBar
 from core.ui.editor import CodeEditor
 from core.ui.terminal import Terminal
 from core.ai.ai_engine import AIEngine
-from core.utils import load_icon
+from core.utilities.utils import load_icon
 from core.ui.theme import get_stylesheet, COLORS
-
+from core.utilities.keybindings import KeyBindingsManager
 
 
 class PyCursorMain(QMainWindow):
@@ -70,10 +70,16 @@ class PyCursorMain(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal_dock)
 
         self.create_activity_bar()
+        
+        self.create_top_toolbar()
 
         self.create_status_bar()
         
+        self.keybindings = KeyBindingsManager()
+        self.setup_keybindings()
+        
         self.create_menu_bar()
+
 
     def create_activity_bar(self):
         """Create VS Code-style Activity Bar using QToolBar"""
@@ -140,6 +146,58 @@ class PyCursorMain(QMainWindow):
         settings_action = QAction(load_icon("settings.svg"), "Settings", self)
         settings_action.triggered.connect(self.open_settings)
         activity_bar.addAction(settings_action)
+    
+    def create_top_toolbar(self):
+        """Create top toolbar with sidebar and terminal toggles"""
+        top_toolbar = QToolBar("View Controls")
+        top_toolbar.setMovable(False)
+        top_toolbar.setFloatable(False)
+        top_toolbar.setIconSize(QSize(16, 16))
+        top_toolbar.setStyleSheet(f"""
+            QToolBar {{
+                background-color: {COLORS['bg_secondary']};
+                border: none;
+                border-bottom: 1px solid {COLORS['border']};
+                spacing: 5px;
+                padding: 4px 8px;
+            }}
+            QToolButton {{
+                background-color: transparent;
+                border: 1px solid {COLORS['border']};
+                border-radius: 3px;
+                padding: 4px 8px;
+                color: {COLORS['text_primary']};
+                font-size: 11px;
+            }}
+            QToolButton:hover {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['border_light']};
+            }}
+            QToolButton:checked {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['accent_blue']};
+            }}
+        """)
+        
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, top_toolbar)
+        
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        top_toolbar.addWidget(spacer)
+        
+        sidebar_toggle = QAction("☰ Sidebar", self)
+        sidebar_toggle.setCheckable(True)
+        sidebar_toggle.setChecked(self.sidebar_dock.isVisible())
+        sidebar_toggle.triggered.connect(lambda: self.sidebar_dock.setVisible(sidebar_toggle.isChecked()))
+        top_toolbar.addAction(sidebar_toggle)
+        self.sidebar_toggle_action = sidebar_toggle
+        
+        terminal_toggle = QAction("⌨ Terminal", self)
+        terminal_toggle.setCheckable(True)
+        terminal_toggle.setChecked(self.terminal_dock.isVisible())
+        terminal_toggle.triggered.connect(lambda: self.terminal_dock.setVisible(terminal_toggle.isChecked()))
+        top_toolbar.addAction(terminal_toggle)
+        self.terminal_toggle_action = terminal_toggle
 
     def open_settings(self):
         from core.ui.settings_dialog import SettingsDialog
@@ -147,19 +205,50 @@ class PyCursorMain(QMainWindow):
         dialog.exec()
 
     def toggle_view(self, view_name):
-        """Handle Activity Bar clicks"""
-        if view_name == "explorer":
-            visible = self.sidebar_dock.isVisible()
-            if visible and self.explorer_action.isChecked():
-                pass
-            
-            self.sidebar_dock.setVisible(self.explorer_action.isChecked())
-            
-        elif view_name == "ai":
+        """Handle Activity Bar clicks with radio button behavior"""
+        sidebar_actions = {
+            "explorer": self.explorer_action,
+            "search": self.search_action,
+            "git": self.git_action,
+        }
+        
+        if view_name == "ai":
             self.ai_dock.setVisible(self.ai_action.isChecked())
+            return
+        
+        if view_name in sidebar_actions:
+            current_action = sidebar_actions[view_name]
             
-        elif view_name in ["search", "git"]:
-            pass
+            if current_action.isChecked():
+                was_active = False
+                if view_name == "explorer" and self.sidebar_dock.isVisible():
+                    was_active = True
+                elif view_name in ["search", "git"]:
+                    was_active = current_action.property("was_active")
+                
+                if was_active:
+                    self.sidebar_dock.setVisible(False)
+                    current_action.setChecked(False)
+                    current_action.setProperty("was_active", False)
+                else:
+                    for name, action in sidebar_actions.items():
+                        if name != view_name:
+                            action.setChecked(False)
+                            action.setProperty("was_active", False)
+                    
+                    current_action.setProperty("was_active", True)
+                    if view_name == "explorer":
+                        self.sidebar_dock.setVisible(True)
+                    elif view_name == "search":
+                        self.sidebar_dock.setVisible(False)
+                        current_action.setChecked(False)
+                    elif view_name == "git":
+                        self.sidebar_dock.setVisible(False)
+                        current_action.setChecked(False)
+            else:
+                self.sidebar_dock.setVisible(False)
+                current_action.setProperty("was_active", False)
+    
     
     def create_status_bar(self):
         """Create VS Code-style status bar"""
@@ -198,24 +287,29 @@ class PyCursorMain(QMainWindow):
         
         self.editor_tabs.currentChanged.connect(self.update_status_bar)
 
+
     def create_menu_bar(self):
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("&File")
 
         open_action = QAction("&Open File...", self)
-        open_action.setShortcut("Ctrl+O")
+        open_action.setShortcut(self.keybindings.get("file.open"))
+        open_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         open_action.triggered.connect(self.open_file_dialog)
 
         open_folder_action = QAction("Open &Folder...", self)
-        open_folder_action.setShortcut("Ctrl+K Ctrl+O")
+        open_folder_action.setShortcut(self.keybindings.get("file.open_folder"))
+        open_folder_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         open_folder_action.triggered.connect(self.open_folder_dialog)
 
         save_action = QAction("&Save", self)
-        save_action.setShortcut("Ctrl+S")
+        save_action.setShortcut(self.keybindings.get("file.save"))
+        save_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         save_action.triggered.connect(self.save_file)
         
         save_as_action = QAction("Save &As...", self)
-        save_as_action.setShortcut("Ctrl+Shift+S")
+        save_as_action.setShortcut(self.keybindings.get("file.save_as"))
+        save_as_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         save_as_action.triggered.connect(lambda: self.save_file(save_as=True))
 
         file_menu.addAction(open_action)
@@ -226,52 +320,61 @@ class PyCursorMain(QMainWindow):
         file_menu.addSeparator()
         
         close_tab_action = QAction("&Close Tab", self)
-        close_tab_action.setShortcut("Ctrl+W")
+        close_tab_action.setShortcut(self.keybindings.get("file.close_tab"))
+        close_tab_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         close_tab_action.triggered.connect(lambda: self.close_editor_tab(self.editor_tabs.currentIndex()))
         file_menu.addAction(close_tab_action)
 
         edit_menu = menu_bar.addMenu("&Edit")
         
         undo_action = QAction("&Undo", self)
-        undo_action.setShortcut("Ctrl+Z")
+        undo_action.setShortcut(self.keybindings.get_sequence("edit.undo"))
         edit_menu.addAction(undo_action)
         
         redo_action = QAction("&Redo", self)
-        redo_action.setShortcut("Ctrl+Y")
+        redo_action.setShortcut(self.keybindings.get_sequence("edit.redo"))
         edit_menu.addAction(redo_action)
         
         edit_menu.addSeparator()
         
         find_action = QAction("&Find", self)
-        find_action.setShortcut("Ctrl+F")
+        find_action.setShortcut(self.keybindings.get_sequence("edit.find"))
         edit_menu.addAction(find_action)
         
         replace_action = QAction("&Replace", self)
-        replace_action.setShortcut("Ctrl+H")
+        replace_action.setShortcut(self.keybindings.get_sequence("edit.replace"))
         edit_menu.addAction(replace_action)
 
         view_menu = menu_bar.addMenu("&View")
         
         toggle_sidebar_action = QAction("Toggle &Explorer", self)
-        toggle_sidebar_action.setShortcut("Ctrl+B")
+        toggle_sidebar_action.setShortcut(self.keybindings.get_sequence("view.toggle_explorer"))
         toggle_sidebar_action.triggered.connect(lambda: self.sidebar_dock.setVisible(not self.sidebar_dock.isVisible()))
         view_menu.addAction(toggle_sidebar_action)
         
         toggle_terminal_action = QAction("Toggle &Terminal", self)
-        toggle_terminal_action.setShortcut("Ctrl+`")
+        toggle_terminal_action.setShortcut(self.keybindings.get_sequence("view.toggle_terminal"))
         toggle_terminal_action.triggered.connect(lambda: self.terminal_dock.setVisible(not self.terminal_dock.isVisible()))
         view_menu.addAction(toggle_terminal_action)
         
         toggle_ai_action = QAction("Toggle &AI Assistant", self)
-        toggle_ai_action.setShortcut("Ctrl+Shift+A")
+        toggle_ai_action.setShortcut(self.keybindings.get_sequence("view.toggle_ai"))
         toggle_ai_action.triggered.connect(lambda: self.ai_dock.setVisible(not self.ai_dock.isVisible()))
         view_menu.addAction(toggle_ai_action)
+        
+        view_menu.addSeparator()
+        
+        command_palette_action = QAction("Command &Palette", self)
+        command_palette_action.setShortcut(self.keybindings.get_sequence("app.command_palette"))
+        command_palette_action.triggered.connect(self.show_command_palette)
+        view_menu.addAction(command_palette_action)
 
         run_menu = menu_bar.addMenu("&Run")
         run_action = QAction("&Run Code", self)
-        run_action.setShortcut("Ctrl+Shift+R")
+        run_action.setShortcut(self.keybindings.get_sequence("run.run_code"))
         run_action.triggered.connect(self.execute_current_file)
         run_menu.addAction(run_action)
+    
     
     def update_status_bar(self):
         """Update status bar with current file info"""
@@ -468,6 +571,87 @@ class PyCursorMain(QMainWindow):
     def close_all_editor_tabs(self):
         for i in range(self.editor_tabs.count() - 1, -1, -1):
             self.close_editor_tab(i)
+
+    def setup_keybindings(self):
+        """Register all keyboard shortcuts using the keybindings manager"""
+        self.keybindings.register_shortcut("file.open", self.open_file_dialog, self)
+        self.keybindings.register_shortcut("file.open_folder", self.open_folder_dialog, self)
+        self.keybindings.register_shortcut("file.save", self.save_file, self)
+        self.keybindings.register_shortcut("file.save_as", lambda: self.save_file(save_as=True), self)
+        self.keybindings.register_shortcut("file.close_tab", 
+            lambda: self.close_editor_tab(self.editor_tabs.currentIndex()), self)
+        
+        self.keybindings.register_shortcut("view.toggle_explorer", 
+            lambda: self.sidebar_dock.setVisible(not self.sidebar_dock.isVisible()), self)
+        self.keybindings.register_shortcut("view.toggle_terminal", 
+            lambda: self.terminal_dock.setVisible(not self.terminal_dock.isVisible()), self)
+        self.keybindings.register_shortcut("view.toggle_ai", 
+            lambda: self.ai_dock.setVisible(not self.ai_dock.isVisible()), self)
+        
+        self.keybindings.register_shortcut("run.run_code", self.execute_current_file, self)
+        
+        self.keybindings.register_shortcut("navigation.next_tab", self.next_tab, self)
+        self.keybindings.register_shortcut("navigation.previous_tab", self.previous_tab, self)
+        
+        self.keybindings.register_shortcut("app.quick_open", self.show_quick_open, self)
+        self.keybindings.register_shortcut("app.command_palette", self.show_command_palette, self)
+        self.keybindings.register_shortcut("app.settings", self.open_settings, self)
+
+    def next_tab(self):
+        """Switch to the next editor tab"""
+        current = self.editor_tabs.currentIndex()
+        count = self.editor_tabs.count()
+        if count > 0:
+            self.editor_tabs.setCurrentIndex((current + 1) % count)
+
+    def previous_tab(self):
+        """Switch to the previous editor tab"""
+        current = self.editor_tabs.currentIndex()
+        count = self.editor_tabs.count()
+        if count > 0:
+            self.editor_tabs.setCurrentIndex((current - 1) % count)
+
+    def show_quick_open(self):
+        """Show quick open file dialog"""
+        from core.ui.command_palette import CommandPalette
+        palette = CommandPalette(self, mode="files", project_path=self.project_path)
+        
+        parent_geometry = self.geometry()
+        palette_geometry = palette.geometry()
+        x = parent_geometry.x() + (parent_geometry.width() - palette_geometry.width()) // 2
+        y = parent_geometry.y() + parent_geometry.height() // 4
+        palette.move(x, y)
+        
+        palette.exec()
+
+    def show_command_palette(self):
+        """Show command palette"""
+        from core.ui.command_palette import CommandPalette
+        
+        # Build list of available commands
+        commands = [
+            ("Open File", self.open_file_dialog),
+            ("Open Folder", self.open_folder_dialog),
+            ("Save File", self.save_file),
+            ("Close Tab", lambda: self.close_editor_tab(self.editor_tabs.currentIndex())),
+            ("Toggle Explorer", lambda: self.sidebar_dock.setVisible(not self.sidebar_dock.isVisible())),
+            ("Toggle Terminal", lambda: self.terminal_dock.setVisible(not self.terminal_dock.isVisible())),
+            ("Toggle AI Assistant", lambda: self.ai_dock.setVisible(not self.ai_dock.isVisible())),
+            ("Run File", self.execute_current_file),
+            ("Settings", self.open_settings),
+        ]
+        
+        palette = CommandPalette(self, mode="commands", actions=commands)
+        
+        # Center the palette on the main window
+        parent_geometry = self.geometry()
+        palette_geometry = palette.geometry()
+        x = parent_geometry.x() + (parent_geometry.width() - palette_geometry.width()) // 2
+        y = parent_geometry.y() + parent_geometry.height() // 4
+        palette.move(x, y)
+        
+        palette.exec()
+
 
 
 if __name__ == "__main__":

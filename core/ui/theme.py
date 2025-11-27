@@ -41,6 +41,10 @@ COLORS = {
     'button_bg': '#3e3e42',
     'button_hover': '#4e4e4e',
     'button_pressed': '#2d2d30',
+    'button_active': '#2d2d30',
+    
+    'list_hover': '#2a2d2e',
+    'list_selected': '#37373d',
     
     'statusbar_bg': '#007acc',
     'statusbar_text': '#ffffff',
