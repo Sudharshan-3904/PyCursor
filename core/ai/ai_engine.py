@@ -29,16 +29,12 @@ class AIEngine(QWidget):
 
         self.local_model_handler = LocalModelHandler()
 
-        self.models = self.local_model_handler.detect_models()
-        self.current_model_name = next(iter(self.models.keys()), None)
-        self.current_backend = (
-            "lmstudio" if self.current_model_name and self.current_model_name.startswith("LM Studio") else "ollama"
-        )
+        self.models = {}
+        self.current_model_name = None
+        self.current_backend = "ollama"
 
         self.local_model_handler.backend = self.current_backend
-        self.local_model_handler.model_name = (
-            self.current_model_name.split(": ", 1)[-1] if self.current_model_name else None
-        )
+        self.local_model_handler.model_name = None
 
         self.api_model_handler = APIModelHandler()
         self.api_config = None
@@ -153,6 +149,17 @@ class AIEngine(QWidget):
 
         self.setLayout(main_layout)
 
+
+    def update_models(self, models: dict):
+        """Update the list of available models"""
+        self.models = models
+        
+        # Set default if not set
+        if not self.current_model_name and self.models:
+            self.current_model_name = next(iter(self.models.keys()), None)
+            self.on_model_change(self.current_model_name)
+            
+        self.populate_model_menu()
 
     def populate_model_menu(self):
         self.model_menu.clear()

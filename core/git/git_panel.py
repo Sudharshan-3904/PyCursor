@@ -27,7 +27,7 @@ class GitPanel(QWidget):
         self.repo_path = repo_path
         self.init_ui()
         
-        self.update_view()
+        # self.update_view() # Deferred to startup thread
     
     def init_ui(self):
         layout = QVBoxLayout()
@@ -324,7 +324,7 @@ class GitPanel(QWidget):
             self.refresh()
         self.update_view()
     
-    def refresh(self):
+    def refresh(self, status=None, branches=None, current_branch=None):
         """Refresh the Git status"""
         if not self.git_handler.repo:
             return
@@ -332,8 +332,12 @@ class GitPanel(QWidget):
         # Update branches
         self.branch_combo.blockSignals(True)
         self.branch_combo.clear()
-        current_branch = self.git_handler.get_current_branch()
-        branches = self.git_handler.get_branches()
+        
+        if current_branch is None:
+            current_branch = self.git_handler.get_current_branch()
+        
+        if branches is None:
+            branches = self.git_handler.get_branches()
         
         self.branch_combo.addItems(branches)
         if current_branch:
@@ -349,7 +353,8 @@ class GitPanel(QWidget):
         unstaged_root = QTreeWidgetItem(self.changes_tree, ["Changes"])
         unstaged_root.setExpanded(True)
         
-        status = self.git_handler.get_status()
+        if status is None:
+            status = self.git_handler.get_status()
         
         for file_status in status:
             icon_text = self.get_status_icon(file_status.status)

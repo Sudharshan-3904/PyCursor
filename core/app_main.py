@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QTabBar, QPushButton, QWidget, QLabel, QVBoxLayout,
     QHBoxLayout, QStatusBar, QToolBar, QSizePolicy, QStackedWidget
 )
-from PyQt6.QtCore import Qt, QTimer, QSize
+from PyQt6.QtCore import Qt, QTimer, QSize, QThread, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QFont
 
 from core.ui.sidebar import SideBar
@@ -17,6 +17,43 @@ from core.utilities.utils import load_icon
 from core.ui.theme import get_stylesheet, COLORS
 from core.utilities.keybindings import KeyBindingsManager
 from core.git.git_panel import GitPanel
+from core.git.git_handler import GitHandler
+from core.ai.local_model_handler import LocalModelHandler
+
+
+class StartupThread(QThread):
+    models_ready = pyqtSignal(dict)
+    git_ready = pyqtSignal(bool, object, object, object) # is_repo, status, branches, current_branch
+
+    def __init__(self, project_path):
+        super().__init__()
+        self.project_path = project_path
+
+    def run(self):
+        # 1. Detect AI Models
+        try:
+            handler = LocalModelHandler()
+            models = handler.detect_models()
+            self.models_ready.emit(models)
+        except Exception as e:
+            print(f"Model detection failed: {e}")
+            self.models_ready.emit({})
+
+        # 2. Check Git Status
+        try:
+            if self.project_path:
+                git = GitHandler(self.project_path)
+                if git.is_repository(self.project_path):
+                    git.open_repository(self.project_path)
+                    current_branch = git.get_current_branch()
+                    branches = git.get_branches()
+                    status = git.get_status()
+                    self.git_ready.emit(True, status, branches, current_branch)
+                else:
+                    self.git_ready.emit(False, None, None, None)
+        except Exception as e:
+            print(f"Git check failed: {e}")
+            self.git_ready.emit(False, None, None, None)
 
 
 class PyCursorMain(QMainWindow):
@@ -82,14 +119,35 @@ class PyCursorMain(QMainWindow):
 
         self.create_activity_bar()
         
-        self.create_top_toolbar()
-
+        
         self.create_status_bar()
         
         self.keybindings = KeyBindingsManager()
         self.setup_keybindings()
         
+        
         self.create_menu_bar()
+
+        # Start background loading
+        self.startup_thread = StartupThread(self.project_path)
+        self.startup_thread.models_ready.connect(self.on_models_loaded)
+        self.startup_thread.git_ready.connect(self.on_git_ready)
+        self.startup_thread.start()
+
+    def on_models_loaded(self, models):
+        if hasattr(self, 'ai_widget'):
+            self.ai_widget.update_models(models)
+
+    def on_git_ready(self, is_repo, status, branches, current_branch):
+        if hasattr(self, 'git_panel'):
+            if is_repo:
+                self.git_panel.stack.setCurrentWidget(self.git_panel.repo_widget)
+                self.git_panel.refresh(status, branches, current_branch)
+                if current_branch:
+                    self.status_git_label.setText(current_branch)
+            else:
+                self.git_panel.stack.setCurrentWidget(self.git_panel.no_repo_widget)
+                self.status_git_label.setText("")
 
 
     def create_activity_bar(self):
@@ -142,13 +200,7 @@ class PyCursorMain(QMainWindow):
         git_action.triggered.connect(lambda: self.toggle_view("git"))
         activity_bar.addAction(git_action)
         self.git_action = git_action
-        
-        ai_action = QAction(load_icon("ai_chat.svg"), "AI Assistant", self)
-        ai_action.setCheckable(True)
-        ai_action.setChecked(True)
-        ai_action.triggered.connect(lambda: self.toggle_view("ai"))
-        activity_bar.addAction(ai_action)
-        self.ai_action = ai_action
+
 
         empty = QWidget()
         empty.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -158,57 +210,6 @@ class PyCursorMain(QMainWindow):
         settings_action.triggered.connect(self.open_settings)
         activity_bar.addAction(settings_action)
     
-    def create_top_toolbar(self):
-        """Create top toolbar with sidebar and terminal toggles"""
-        top_toolbar = QToolBar("View Controls")
-        top_toolbar.setMovable(False)
-        top_toolbar.setFloatable(False)
-        top_toolbar.setIconSize(QSize(16, 16))
-        top_toolbar.setStyleSheet(f"""
-            QToolBar {{
-                background-color: {COLORS['bg_secondary']};
-                border: none;
-                border-bottom: 1px solid {COLORS['border']};
-                spacing: 5px;
-                padding: 4px 8px;
-            }}
-            QToolButton {{
-                background-color: transparent;
-                border: 1px solid {COLORS['border']};
-                border-radius: 3px;
-                padding: 4px 8px;
-                color: {COLORS['text_primary']};
-                font-size: 11px;
-            }}
-            QToolButton:hover {{
-                background-color: {COLORS['bg_tertiary']};
-                border: 1px solid {COLORS['border_light']};
-            }}
-            QToolButton:checked {{
-                background-color: {COLORS['bg_tertiary']};
-                border: 1px solid {COLORS['accent_blue']};
-            }}
-        """)
-        
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, top_toolbar)
-        
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        top_toolbar.addWidget(spacer)
-        
-        sidebar_toggle = QAction("☰ Sidebar", self)
-        sidebar_toggle.setCheckable(True)
-        sidebar_toggle.setChecked(self.sidebar_dock.isVisible())
-        sidebar_toggle.triggered.connect(lambda: self.sidebar_dock.setVisible(sidebar_toggle.isChecked()))
-        top_toolbar.addAction(sidebar_toggle)
-        self.sidebar_toggle_action = sidebar_toggle
-        
-        terminal_toggle = QAction("⌨ Terminal", self)
-        terminal_toggle.setCheckable(True)
-        terminal_toggle.setChecked(self.terminal_dock.isVisible())
-        terminal_toggle.triggered.connect(lambda: self.terminal_dock.setVisible(terminal_toggle.isChecked()))
-        top_toolbar.addAction(terminal_toggle)
-        self.terminal_toggle_action = terminal_toggle
 
     def open_settings(self):
         from core.ui.settings_dialog import SettingsDialog
@@ -222,10 +223,6 @@ class PyCursorMain(QMainWindow):
             "search": self.search_action,
             "git": self.git_action,
         }
-        
-        if view_name == "ai":
-            self.ai_dock.setVisible(self.ai_action.isChecked())
-            return
         
         if view_name in sidebar_actions:
             current_action = sidebar_actions[view_name]
@@ -394,6 +391,59 @@ class PyCursorMain(QMainWindow):
         run_action.setShortcut(self.keybindings.get_sequence("run.run_code"))
         run_action.triggered.connect(self.execute_current_file)
         run_menu.addAction(run_action)
+
+        # --- Corner Widget for Menu Bar (View Toggles) ---
+        corner_widget = QWidget()
+        corner_layout = QHBoxLayout()
+        corner_layout.setContentsMargins(0, 0, 5, 0)
+        corner_layout.setSpacing(5)
+        corner_widget.setLayout(corner_layout)
+
+        # Re-using the styles from the old toolbar for consistency
+        btn_style = f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {COLORS['border']};
+                border-radius: 3px;
+                padding: 3px 8px;
+                color: {COLORS['text_primary']};
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['border_light']};
+            }}
+            QPushButton:checked {{
+                background-color: {COLORS['bg_tertiary']};
+                border: 1px solid {COLORS['accent_blue']};
+            }}
+        """
+
+        self.sidebar_toggle_btn = QPushButton("☰")
+        self.sidebar_toggle_btn.setCheckable(True)
+        self.sidebar_toggle_btn.setChecked(self.sidebar_dock.isVisible())
+        self.sidebar_toggle_btn.clicked.connect(lambda checked: self.sidebar_dock.setVisible(checked))
+        self.sidebar_dock.visibilityChanged.connect(self.sidebar_toggle_btn.setChecked)
+        self.sidebar_toggle_btn.setStyleSheet(btn_style)
+        corner_layout.addWidget(self.sidebar_toggle_btn)
+
+        self.terminal_toggle_btn = QPushButton("⌨")
+        self.terminal_toggle_btn.setCheckable(True)
+        self.terminal_toggle_btn.setChecked(self.terminal_dock.isVisible())
+        self.terminal_toggle_btn.clicked.connect(lambda checked: self.terminal_dock.setVisible(checked))
+        self.terminal_dock.visibilityChanged.connect(self.terminal_toggle_btn.setChecked)
+        self.terminal_toggle_btn.setStyleSheet(btn_style)
+        corner_layout.addWidget(self.terminal_toggle_btn)
+
+        self.ai_toggle_btn = QPushButton("✨")
+        self.ai_toggle_btn.setCheckable(True)
+        self.ai_toggle_btn.setChecked(self.ai_dock.isVisible())
+        self.ai_toggle_btn.clicked.connect(lambda checked: self.ai_dock.setVisible(checked))
+        self.ai_dock.visibilityChanged.connect(self.ai_toggle_btn.setChecked)
+        self.ai_toggle_btn.setStyleSheet(btn_style)
+        corner_layout.addWidget(self.ai_toggle_btn)
+        
+        menu_bar.setCornerWidget(corner_widget, Qt.Corner.TopRightCorner)
     
     
     def update_status_bar(self):

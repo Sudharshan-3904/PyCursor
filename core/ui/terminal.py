@@ -3,6 +3,7 @@ import platform
 from PyQt6.QtCore import QProcess, QProcessEnvironment, Qt
 from PyQt6.QtWidgets import QTextEdit, QSizePolicy
 from PyQt6.QtGui import QTextCursor
+from core.ui.theme import COLORS
 
 
 class Terminal(QTextEdit):
@@ -10,14 +11,15 @@ class Terminal(QTextEdit):
         super().__init__()
         self.setReadOnly(False)
         self.setAcceptRichText(False)
-        self.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #d4d4d4;
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {COLORS['bg_secondary']};
+                color: {COLORS['text_primary']};
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 13px;
-                padding: 5px;
-            }
+                padding: 10px;
+                border: none;
+            }}
         """)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(100)
