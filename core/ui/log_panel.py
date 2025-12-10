@@ -1,8 +1,21 @@
+"""
+Log Panel Module
+
+This module implements a centralized logging widget for the application.
+It provides a read-only text area to display system messages, errors, and status updates,
+keeping them separate from the primary AI chat interface.
+"""
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
 from PyQt6.QtCore import Qt
 from core.ui.theme import COLORS
 
 class LogPanel(QWidget):
+    """
+    A widget acting as a system console for application logs.
+    
+    Displays chronological log messages with auto-scrolling capabilities.
+    Designed to sit in the sidebar stack.
+    """
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout()

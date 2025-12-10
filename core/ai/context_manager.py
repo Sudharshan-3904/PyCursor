@@ -1,7 +1,21 @@
+"""
+AI Context Manager Module
+
+This module is responsible for retrieving relevant code context from the user's project
+to enhance the AI assistant's responses. It supports explicit file mentions (e.g., @main.py)
+and heuristic-based file retrieval.
+"""
 import os
 import fnmatch
 
 class ContextManager:
+    """
+    Manages the retrieval of file context for the AI.
+    
+    This class scans the project directory, filters ignored files, and retrieves
+    file content based on user queries or explicit mentions. It ensures the
+    AI has the necessary code snippets to understand the user's request.
+    """
     def __init__(self, project_path=None):
         self.project_path = project_path
         self.max_context_length = 8000  # Character limit for context to avoid overflowing context window

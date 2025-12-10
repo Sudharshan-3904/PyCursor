@@ -1,3 +1,11 @@
+"""
+AI Engine Module
+
+This module provides the central widget and logic for the AI Assistant. It orchestrates
+interactions between the user and various AI backends (local, API-based). It manages
+the chat interface, model selection, context retrieval, and specialized AI tools like
+docstring generation and linting.
+"""
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QMenu,
@@ -17,6 +25,13 @@ from core.utilities.worker import WorkerThread
 from core.ai.context_manager import ContextManager
 
 class AIEngine(QWidget):
+    """
+    The main widget for the AI Assistant.
+    
+    This class handles the UI for chat, connects to model handlers (LocalModelHandler,
+    APIModelHandler), and provides access to AI tools. It serves as the bridge between
+    the user's queries and the underlying AI services.
+    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("AI Assistant")

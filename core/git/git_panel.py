@@ -1,7 +1,11 @@
 """
-Git Panel UI for PyCursor IDE
+Git Panel UI Module
 
-Provides a visual interface for Git operations.
+This module implements the Git Panel widget for the PyCursor IDE sidebar. It handles:
+- Repository status visualization (staged/unstaged changes, branches).
+- Git operations interface (Stage, Unstage, Commit, Push, Pull, Fetch).
+- Branch management (switching branches).
+- Repository initialization and cloning.
 """
 
 from PyQt6.QtWidgets import (
@@ -18,7 +22,14 @@ import os
 
 
 class GitPanel(QWidget):
-    """Git panel widget for the sidebar"""
+    """
+    The main widget for Git integration within the IDE sidebar.
+    
+    This class manages the UI for interacting with Git repositories. It uses a
+    QStackedWidget to toggle between a 'No Repository' state (allowing init/clone)
+    and an active 'Repository' state (showing changes, commits, etc.).
+    It communicates with `GitHandler` for actual Git operations.
+    """
     
     file_selected = pyqtSignal(str)
     
@@ -569,3 +580,33 @@ class GitPanel(QWidget):
             from core.ui.diff_viewer import DiffViewer
             viewer = DiffViewer(file_path, diff, self)
             viewer.exec()
+
+    def show_blame(self, file_path: str):
+        """Show Git blame for the file"""
+        if not self.git_handler.repo:
+            QMessageBox.information(self, "Git Info", "Not a git repository.")
+            return
+        
+        rel_path = os.path.relpath(file_path, self.repo_path)
+        blame_data = self.git_handler.get_file_blame(rel_path)
+        if blame_data:
+            from core.ui.git_dialogs import GitBlameDialog
+            dialog = GitBlameDialog(os.path.basename(file_path), blame_data, self)
+            dialog.exec()
+        else:
+            QMessageBox.information(self, "Git Info", "No blame information available.")
+
+    def show_history(self, file_path: str):
+        """Show Git history for the file"""
+        if not self.git_handler.repo:
+            QMessageBox.information(self, "Git Info", "Not a git repository.")
+            return
+            
+        rel_path = os.path.relpath(file_path, self.repo_path)
+        history_data = self.git_handler.get_file_history(rel_path)
+        if history_data:
+            from core.ui.git_dialogs import GitHistoryDialog
+            dialog = GitHistoryDialog(os.path.basename(file_path), history_data, self)
+            dialog.exec()
+        else:
+            QMessageBox.information(self, "Git Info", "No history available.")
