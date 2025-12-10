@@ -18,8 +18,10 @@ from core.ui.theme import get_stylesheet, COLORS
 from core.utilities.keybindings import KeyBindingsManager
 from core.git.git_panel import GitPanel
 from core.git.git_handler import GitHandler
+from core.git.git_handler import GitHandler
 from core.ai.local_model_handler import LocalModelHandler
 from core.ui.keybindings_dialog import KeybindingsDialog
+from core.ui.log_panel import LogPanel
 
 
 class StartupThread(QThread):
@@ -88,6 +90,10 @@ class PyCursorMain(QMainWindow):
         self.git_panel.file_selected.connect(self.open_file_in_tab)
         self.sidebar_stack.addWidget(self.git_panel)
 
+        # 3. Logs Panel
+        self.log_panel = LogPanel()
+        self.sidebar_stack.addWidget(self.log_panel)
+
         self.sidebar_dock = QDockWidget("EXPLORER", self)
         self.sidebar_dock.setWidget(self.sidebar_stack)
         self.sidebar_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea)
@@ -134,15 +140,21 @@ class PyCursorMain(QMainWindow):
     def on_models_loaded(self, models):
         if hasattr(self, 'ai_widget'):
             self.ai_widget.update_models(models)
+            model_count = len(models)
+            self.log_panel.log(f"[Startup] Detected {model_count} AI models.")
+            for name in models:
+                self.log_panel.log(f"  - {name}")
 
     def on_git_ready(self, is_repo, status, branches, current_branch):
         if hasattr(self, 'git_panel'):
             if is_repo:
+                self.log_panel.log(f"[Startup] Git repository active: {current_branch}")
                 self.git_panel.stack.setCurrentWidget(self.git_panel.repo_widget)
                 self.git_panel.refresh(status, branches, current_branch)
                 if current_branch:
                     self.status_git_label.setText(current_branch)
             else:
+                self.log_panel.log("[Startup] No Git repository detected.")
                 self.git_panel.stack.setCurrentWidget(self.git_panel.no_repo_widget)
                 self.status_git_label.setText("")
 
@@ -197,6 +209,12 @@ class PyCursorMain(QMainWindow):
         git_action.triggered.connect(lambda: self.toggle_view("git"))
         activity_bar.addAction(git_action)
         self.git_action = git_action
+        
+        logs_action = QAction(load_icon("output.svg"), "App Logs", self) # Assuming output.svg exists or uses fallback
+        logs_action.setCheckable(True)
+        logs_action.triggered.connect(lambda: self.toggle_view("logs"))
+        activity_bar.addAction(logs_action)
+        self.logs_action = logs_action
 
 
         empty = QWidget()
@@ -219,6 +237,7 @@ class PyCursorMain(QMainWindow):
             "explorer": self.explorer_action,
             "search": self.search_action,
             "git": self.git_action,
+            "logs": self.logs_action,
         }
         
         if view_name in sidebar_actions:
@@ -255,6 +274,9 @@ class PyCursorMain(QMainWindow):
                         self.sidebar_stack.setCurrentIndex(1)
                         self.sidebar_dock.setWindowTitle("SOURCE CONTROL")
                         self.git_panel.refresh()
+                    elif view_name == "logs":
+                        self.sidebar_stack.setCurrentIndex(2)
+                        self.sidebar_dock.setWindowTitle("APP LOGS")
                     elif view_name == "search":
                         # self.sidebar_stack.setCurrentIndex(2)
                         self.sidebar_dock.setWindowTitle("SEARCH")

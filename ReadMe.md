@@ -10,14 +10,21 @@ It combines the flexibility of a modern code editor with the intelligence of Lar
 ### 🖥️ Core Editor & Layout (✅ Completed)
 
 - Modern PyQt6-based interface with resizable layout using QSplitter
+- **VS Code-inspired Layout**:
+  - **Activity Bar**: Quick access to Explorer, Search, and Source Control.
+  - **Menu Bar**: Full comprehensive menu (File, Edit, View, Go, Run, Terminal, Help).
+  - **Status Bar**: Detailed info (Git branch, file, cursor position, encoding, language).
 - File explorer sidebar with project navigation
 - Integrated terminal with logging support
-- Basic file operations (open/save)
+- Basic file operations (open/save/save all)
 - Code editor with:
   - Line numbers
   - Python syntax highlighting
   - Smart auto-indentation
   - Multi-tab file management
+- **Performance Optimized**:
+  - Multi-threaded application startup.
+  - Asynchronous AI and Git operations to prevent UI freezing.
 
 ### ⚡ Editor Intelligence (✅ Completed)
 

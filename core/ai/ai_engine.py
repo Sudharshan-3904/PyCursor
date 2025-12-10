@@ -214,7 +214,7 @@ class AIEngine(QWidget):
         self.local_model_handler.backend = backend
         self.local_model_handler.model_name = model_identifier
 
-        self.chat_area.append(f"<i>[Switched to {backend} model: {model_identifier}]</i>")
+        # self.chat_area.append(f"<i>[Switched to {backend} model: {model_identifier}]</i>")
 
     def choose_model(self):
         model_names = list(self.models.keys())
@@ -237,7 +237,7 @@ class AIEngine(QWidget):
                 backend=self.current_backend,
                 model_name=item.split(": ", 1)[-1]
             )
-            self.chat_area.append(f"<i>[Model switched to: {self.current_model_name}]</i>")
+            # self.chat_area.append(f"<i>[Model switched to: {self.current_model_name}]</i>")
 
     def toggle_api_local(self):
         self.using_api = self.api_local_btn.isChecked()
@@ -252,9 +252,11 @@ class AIEngine(QWidget):
         """Toggle agent mode on/off"""
         self.agent_mode = self.agent_mode_btn.isChecked()
         if self.agent_mode:
-            self.chat_area.append("<i>[Agent Mode ENABLED - AI can now read, create, and write files]</i>")
+            # self.chat_area.append("<i>[Agent Mode ENABLED - AI can now read, create, and write files]</i>")
+            pass
         else:
-            self.chat_area.append("<i>[Agent Mode DISABLED - AI responses only]</i>")
+            # self.chat_area.append("<i>[Agent Mode DISABLED - AI responses only]</i>")
+            pass
 
 
     def api_model_response(self, prompt, model_identifier):

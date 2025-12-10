@@ -112,6 +112,31 @@
 - GUI for version control in PyQt6.
 - Real-time file state tracking.
 
+- GUI for version control in PyQt6.
+- Real-time file state tracking.
+
+---
+
+## **Phase 4.5: UX Renewal & Performance Optimization** ✅ Completed
+
+**Goal:** Modernize the UI to match high-end IDE standards and ensure responsiveness.
+
+**Tasks Completed:**
+- **VS Code-like Architecture**:
+  - Implemented standard Menu Bar, Activity Bar, and Status Bar layouts.
+  - Consolidated view toggles and improved access to features.
+- **Visual Overhaul**:
+  - Implemented a unified **Catppuccin-inspired dark theme**.
+  - Refined styling for all widgets (buttons, inputs, tabs, scrollbars) with rounded corners and hover effects.
+- **Performance Engineering**:
+  - **Multi-threaded Startup**: AI detection and Git status checks run in background threads to speed up launch.
+  - **Asynchronous Operations**: Git commands (pull/push/commit) and AI generation run on worker threads to keep the UI fluid.
+  - **Optimized Status Bar**: Real-time cursor tracking and file info without lag.
+- **New Features**:
+  - **Command Palette** for quick access to actions.
+  - **Keyboard Shortcuts Dialog** for viewing and editing bindings.
+  - **Settings Dialog** for configuring AI and other preferences.
+
 ---
 
 ## **Phase 5: Python Environment & Dependency Management** ⏳ Planned
@@ -151,12 +176,16 @@
 
 ---
 
-## **Phase 7: Plugin System & Theming** ⏳ Planned
+## **Phase 7: Plugin System & Theming** 🚧 In Progress
 
 **Goal:** Make IDE extendable and customizable.
 
 **Tasks:**
 
+- **Theming** (✅ Partially Completed):
+  - Centralized `theme.py` with color palette.
+  - Global stylesheet application.
+  - *Next*: specific light mode support.
 - **Plugin system** for custom features.
 - Install/enable plugins dynamically.
 - **Themes**: light/dark modes, customizable syntax highlighting.
@@ -208,9 +237,10 @@
 | 2     | Editor Intelligence & UX    | ✅ Completed   |
 | 3     | LLM Integration             | ✅ Completed   |
 | 4     | Git & GitHub                | ✅ Completed   |
+| 4.5   | UX & Performance            | ✅ Completed   |
 | 5     | Env & Dependency Management | ⏳ Planned     |
 | 6     | Multi-language Support      | ⏳ Planned     |
-| 7     | Plugin System & Theming     | ⏳ Planned     |
+| 7     | Plugin System & Theming     | 🚧 In Progress |
 | 8     | Polishing & Deployment      | ⏳ Planned     |
 | 9     | Future Enhancements         | ⏳ Optional    |
 
