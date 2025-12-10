@@ -13,6 +13,7 @@ from .code_linter import CodeLinter
 
 
 from core.ui.theme import COLORS
+from core.utilities.worker import WorkerThread
 
 class AIEngine(QWidget):
     def __init__(self):
@@ -319,9 +320,25 @@ For code edits, use <<<edit>>> tags as usual."""
 
         if self.using_api:
             model_identifier = next(iter(self.models.values()), "default")
-            response = self.api_model_response(full_prompt, model_identifier)
+            # Create worker for API
+            self.worker = WorkerThread(self.api_model_response, full_prompt, model_identifier)
         else:
-            response = self.run_model(full_prompt)
+            # Create worker for Local
+            self.worker = WorkerThread(self.run_model, full_prompt)
+        
+        self.worker.result_ready.connect(self.handle_ai_response)
+        self.worker.error_occurred.connect(self.handle_ai_error)
+        self.worker.finished.connect(self.on_worker_finished)
+        
+        self.send_btn.setEnabled(False)
+        self.input_field.setEnabled(False)
+        self.chat_area.append("<i>Processing...</i>")
+        
+        self.worker.start()
+
+    def handle_ai_response(self, response):
+        # Remove "Processing..." line if possible, or just append
+        # For simplicity, we just append the result
         
         # Handle agent mode file operations
         if self.agent_mode:
@@ -333,10 +350,18 @@ For code edits, use <<<edit>>> tags as usual."""
                 self.chat_area.append("<i>[AI wrote changes to the editor]</i>")
             except Exception as e:
                 self.chat_area.append(f"<i>[Failed to apply response to editor: {e}]</i>")
-            return
-
-        self.chat_area.append(f"<b>AI:</b> {response}\n")
+        else:
+            self.chat_area.append(f"<b>AI:</b> {response}\n")
+            
         self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
+
+    def handle_ai_error(self, error_msg):
+        self.chat_area.append(f"<span style='color:red'>Error: {error_msg}</span>")
+
+    def on_worker_finished(self):
+        self.send_btn.setEnabled(True)
+        self.input_field.setEnabled(True)
+        self.input_field.setFocus()
 
     def process_agent_commands(self, response: str) -> str:
         """Process agent mode file operation commands"""

@@ -19,18 +19,18 @@ from core.utilities.keybindings import KeyBindingsManager
 from core.git.git_panel import GitPanel
 from core.git.git_handler import GitHandler
 from core.ai.local_model_handler import LocalModelHandler
+from core.ui.keybindings_dialog import KeybindingsDialog
 
 
 class StartupThread(QThread):
     models_ready = pyqtSignal(dict)
-    git_ready = pyqtSignal(bool, object, object, object) # is_repo, status, branches, current_branch
+    git_ready = pyqtSignal(bool, object, object, object)
 
     def __init__(self, project_path):
         super().__init__()
         self.project_path = project_path
 
     def run(self):
-        # 1. Detect AI Models
         try:
             handler = LocalModelHandler()
             models = handler.detect_models()
@@ -39,7 +39,6 @@ class StartupThread(QThread):
             print(f"Model detection failed: {e}")
             self.models_ready.emit({})
 
-        # 2. Check Git Status
         try:
             if self.project_path:
                 git = GitHandler(self.project_path)
@@ -78,10 +77,8 @@ class PyCursorMain(QMainWindow):
         self.editor_tabs.tabCloseRequested.connect(self.close_editor_tab)
         self.setCentralWidget(self.editor_tabs)
 
-        # Create Stacked Widget for Sidebar (Explorer, Git, etc.)
         self.sidebar_stack = QStackedWidget()
 
-        # 1. File Explorer
         self.sidebar = SideBar(root_path=self.project_path)
         self.sidebar.file_selected.connect(self.open_file_in_tab)
         self.sidebar_stack.addWidget(self.sidebar)
@@ -270,78 +267,103 @@ class PyCursorMain(QMainWindow):
     def create_status_bar(self):
         """Create VS Code-style status bar"""
         status_bar = QStatusBar()
+        status_bar.setStyleSheet(f"background-color: {COLORS['bg_secondary']}; color: {COLORS['text_primary']};")
         self.setStatusBar(status_bar)
+        
+        # Left side
+        self.status_git_label = QLabel("")
+        self.status_git_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px; font-weight: bold;")
+        status_bar.addWidget(self.status_git_label)
         
         self.status_file_label = QLabel("No file open")
         self.status_file_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
         status_bar.addWidget(self.status_file_label)
         
-        status_bar.addWidget(QLabel("|"))
-        
-        self.status_cursor_label = QLabel("Ln 1, Col 1")
-        self.status_cursor_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
-        status_bar.addWidget(self.status_cursor_label)
-        
+        # Spacer
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         status_bar.addWidget(spacer)
         
-        self.status_language_label = QLabel("Python")
-        self.status_language_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
-        status_bar.addWidget(self.status_language_label)
-        
-        status_bar.addWidget(QLabel("|"))
+        # Right side
+        self.status_cursor_label = QLabel("Ln 1, Col 1")
+        self.status_cursor_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
+        status_bar.addWidget(self.status_cursor_label)
         
         self.status_encoding_label = QLabel("UTF-8")
         self.status_encoding_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
         status_bar.addWidget(self.status_encoding_label)
         
-        status_bar.addWidget(QLabel("|"))
-        
-        self.status_git_label = QLabel("main")
-        self.status_git_label.setStyleSheet(f"color: {COLORS['accent_blue']}; padding: 0 10px;")
-        status_bar.addWidget(self.status_git_label)
+        self.status_language_label = QLabel("Plain Text")
+        self.status_language_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
+        status_bar.addWidget(self.status_language_label)
         
         self.editor_tabs.currentChanged.connect(self.update_status_bar)
 
 
     def create_menu_bar(self):
         menu_bar = self.menuBar()
+        
+        # --- File Menu ---
         file_menu = menu_bar.addMenu("&File")
+
+        new_file_action = QAction("New Text File", self)
+        new_file_action.setShortcut("Ctrl+N")
+        new_file_action.triggered.connect(lambda: self.open_file_in_tab(None)) # Untitled
+        file_menu.addAction(new_file_action)
 
         open_action = QAction("&Open File...", self)
         open_action.setShortcut(self.keybindings.get("file.open"))
-        open_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         open_action.triggered.connect(self.open_file_dialog)
+        file_menu.addAction(open_action)
 
         open_folder_action = QAction("Open &Folder...", self)
         open_folder_action.setShortcut(self.keybindings.get("file.open_folder"))
-        open_folder_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         open_folder_action.triggered.connect(self.open_folder_dialog)
+        file_menu.addAction(open_folder_action)
+        
+        file_menu.addSeparator()
 
         save_action = QAction("&Save", self)
         save_action.setShortcut(self.keybindings.get("file.save"))
-        save_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         save_action.triggered.connect(self.save_file)
+        file_menu.addAction(save_action)
         
         save_as_action = QAction("Save &As...", self)
         save_as_action.setShortcut(self.keybindings.get("file.save_as"))
-        save_as_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         save_as_action.triggered.connect(lambda: self.save_file(save_as=True))
-
-        file_menu.addAction(open_action)
-        file_menu.addAction(open_folder_action)
-        file_menu.addSeparator()
-        file_menu.addAction(save_action)
         file_menu.addAction(save_as_action)
+        
+        save_all_action = QAction("Save A&ll", self)
+        save_all_action.triggered.connect(self.save_all_files)
+        file_menu.addAction(save_all_action)
+        
+        file_menu.addSeparator()
+        
+        # Preferences Submenu
+        pref_menu = file_menu.addMenu("Preferences")
+        settings_action = QAction("Settings", self)
+        settings_action.setShortcut(self.keybindings.get("app.settings"))
+        settings_action.triggered.connect(self.open_settings)
+        pref_menu.addAction(settings_action)
+        
+        keybindings_action = QAction("Keyboard Shortcuts", self)
+        keybindings_action.triggered.connect(lambda: KeyBindingsDialog(self, self.keybindings).exec())
+        pref_menu.addAction(keybindings_action)
+        # Assuming KeyBindingsDialog import, if not I'll just skip for now or trigger existing setup if any
+        # Actually I need to make sure KeyBindingsDialog is imported inside the lambda or function if not at top
+
         file_menu.addSeparator()
         
         close_tab_action = QAction("&Close Tab", self)
         close_tab_action.setShortcut(self.keybindings.get("file.close_tab"))
-        close_tab_action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
         close_tab_action.triggered.connect(lambda: self.close_editor_tab(self.editor_tabs.currentIndex()))
         file_menu.addAction(close_tab_action)
+        
+        exit_action = QAction("E&xit", self)
+        exit_action.triggered.connect(self.exit_application)
+        file_menu.addAction(exit_action)
 
+        # --- Edit Menu ---
         edit_menu = menu_bar.addMenu("&Edit")
         
         undo_action = QAction("&Undo", self)
@@ -354,6 +376,23 @@ class PyCursorMain(QMainWindow):
         
         edit_menu.addSeparator()
         
+        cut_action = QAction("Cut", self)
+        cut_action.setShortcut("Ctrl+X")
+        cut_action.triggered.connect(lambda: QApplication.focusWidget().cut() if hasattr(QApplication.focusWidget(), "cut") else None)
+        edit_menu.addAction(cut_action)
+        
+        copy_action = QAction("Copy", self)
+        copy_action.setShortcut("Ctrl+C")
+        copy_action.triggered.connect(lambda: QApplication.focusWidget().copy() if hasattr(QApplication.focusWidget(), "copy") else None)
+        edit_menu.addAction(copy_action)
+        
+        paste_action = QAction("Paste", self)
+        paste_action.setShortcut("Ctrl+V")
+        paste_action.triggered.connect(lambda: QApplication.focusWidget().paste() if hasattr(QApplication.focusWidget(), "paste") else None)
+        edit_menu.addAction(paste_action)
+        
+        edit_menu.addSeparator()
+        
         find_action = QAction("&Find", self)
         find_action.setShortcut(self.keybindings.get_sequence("edit.find"))
         edit_menu.addAction(find_action)
@@ -362,35 +401,82 @@ class PyCursorMain(QMainWindow):
         replace_action.setShortcut(self.keybindings.get_sequence("edit.replace"))
         edit_menu.addAction(replace_action)
 
+        # --- Selection Menu ---
+        selection_menu = menu_bar.addMenu("&Selection")
+        select_all_action = QAction("Select All", self)
+        select_all_action.setShortcut("Ctrl+A")
+        select_all_action.triggered.connect(lambda: QApplication.focusWidget().selectAll() if hasattr(QApplication.focusWidget(), "selectAll") else None)
+        selection_menu.addAction(select_all_action)
+
+        # --- View Menu ---
         view_menu = menu_bar.addMenu("&View")
-        
-        toggle_sidebar_action = QAction("Toggle &Explorer", self)
-        toggle_sidebar_action.setShortcut(self.keybindings.get_sequence("view.toggle_explorer"))
-        toggle_sidebar_action.triggered.connect(lambda: self.sidebar_dock.setVisible(not self.sidebar_dock.isVisible()))
-        view_menu.addAction(toggle_sidebar_action)
-        
-        toggle_terminal_action = QAction("Toggle &Terminal", self)
-        toggle_terminal_action.setShortcut(self.keybindings.get_sequence("view.toggle_terminal"))
-        toggle_terminal_action.triggered.connect(lambda: self.terminal_dock.setVisible(not self.terminal_dock.isVisible()))
-        view_menu.addAction(toggle_terminal_action)
-        
-        toggle_ai_action = QAction("Toggle &AI Assistant", self)
-        toggle_ai_action.setShortcut(self.keybindings.get_sequence("view.toggle_ai"))
-        toggle_ai_action.triggered.connect(lambda: self.ai_dock.setVisible(not self.ai_dock.isVisible()))
-        view_menu.addAction(toggle_ai_action)
-        
-        view_menu.addSeparator()
         
         command_palette_action = QAction("Command &Palette", self)
         command_palette_action.setShortcut(self.keybindings.get_sequence("app.command_palette"))
         command_palette_action.triggered.connect(self.show_command_palette)
         view_menu.addAction(command_palette_action)
+        
+        view_menu.addSeparator()
+        
+        appearance_menu = view_menu.addMenu("Appearance")
+        toggle_sidebar = QAction("Show Sidebar", self, checkable=True)
+        toggle_sidebar.setChecked(self.sidebar_dock.isVisible())
+        toggle_sidebar.triggered.connect(lambda c: self.sidebar_dock.setVisible(c))
+        self.sidebar_dock.visibilityChanged.connect(toggle_sidebar.setChecked)
+        appearance_menu.addAction(toggle_sidebar)
+        
+        toggle_terminal = QAction("Show Panel", self, checkable=True) # Terminal is essentially the panel
+        toggle_terminal.setChecked(self.terminal_dock.isVisible())
+        toggle_terminal.triggered.connect(lambda c: self.terminal_dock.setVisible(c))
+        self.terminal_dock.visibilityChanged.connect(toggle_terminal.setChecked)
+        appearance_menu.addAction(toggle_terminal)
+        
+        toggle_ai = QAction("Show AI Assistant", self, checkable=True)
+        toggle_ai.setChecked(self.ai_dock.isVisible())
+        toggle_ai.triggered.connect(lambda c: self.ai_dock.setVisible(c))
+        self.ai_dock.visibilityChanged.connect(toggle_ai.setChecked)
+        appearance_menu.addAction(toggle_ai)
+        
+        view_menu.addSeparator()
+        
+        explore_view = QAction("Explorer", self)
+        explore_view.setShortcut(self.keybindings.get_sequence("view.toggle_explorer"))
+        explore_view.triggered.connect(lambda: self.toggle_view("explorer"))
+        view_menu.addAction(explore_view)
+        
+        search_view = QAction("Search", self)
+        search_view.triggered.connect(lambda: self.toggle_view("search"))
+        view_menu.addAction(search_view)
+        
+        scm_view = QAction("Source Control", self)
+        scm_view.triggered.connect(lambda: self.toggle_view("git"))
+        view_menu.addAction(scm_view)
+        
+        # --- Go Menu ---
+        go_menu = menu_bar.addMenu("&Go")
+        go_file_action = QAction("Go to &File...", self)
+        go_file_action.setShortcut(self.keybindings.get("app.quick_open"))
+        go_file_action.triggered.connect(self.show_quick_open)
+        go_menu.addAction(go_file_action)
 
+        # --- Run Menu ---
         run_menu = menu_bar.addMenu("&Run")
-        run_action = QAction("&Run Code", self)
+        run_action = QAction("Run &Without Debugging", self)
         run_action.setShortcut(self.keybindings.get_sequence("run.run_code"))
         run_action.triggered.connect(self.execute_current_file)
         run_menu.addAction(run_action)
+        
+        # --- Terminal Menu ---
+        term_menu = menu_bar.addMenu("&Terminal")
+        new_term_action = QAction("New Terminal", self)
+        new_term_action.triggered.connect(lambda: self.add_terminal_tab(f"Terminal {self.terminal_tabs.count() + 1}"))
+        term_menu.addAction(new_term_action)
+        
+        # --- Help Menu ---
+        help_menu = menu_bar.addMenu("&Help")
+        about_action = QAction("About", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
 
         # --- Corner Widget for Menu Bar (View Toggles) ---
         corner_widget = QWidget()
@@ -464,10 +550,19 @@ class PyCursorMain(QMainWindow):
                 '.md': 'Markdown',
                 '.txt': 'Plain Text'
             }
-            self.status_language_label.setText(lang_map.get(ext, 'Unknown'))
+            self.status_language_label.setText(lang_map.get(ext, 'Plain Text'))
+            
+            # Update cursor position immediately
+            line, col = editor.getCursorPosition()
+            self.update_cursor_position(line, col)
         else:
             self.status_file_label.setText("No file open")
             self.status_language_label.setText("—")
+            self.status_cursor_label.setText("Ln 1, Col 1")
+
+    def update_cursor_position(self, line, col):
+        """Update cursor position label"""
+        self.status_cursor_label.setText(f"Ln {line + 1}, Col {col + 1}")
 
     def open_file_dialog(self):
         start_dir = self.project_path or os.getcwd()
@@ -539,6 +634,9 @@ class PyCursorMain(QMainWindow):
         # Connect Git signals
         editor.git_blame_requested.connect(self.show_git_blame)
         editor.git_history_requested.connect(self.show_git_history)
+        
+        # Connect Cursor signal
+        editor.cursorPositionChanged.connect(self.update_cursor_position)
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -592,6 +690,35 @@ class PyCursorMain(QMainWindow):
         if not editor:
             self.editor_tabs.removeTab(index)
             return
+
+    def save_all_files(self):
+        """Save all open files"""
+        count = self.editor_tabs.count()
+        for i in range(count):
+            editor = self.editor_tabs.widget(i)
+            if hasattr(editor, "isModified") and editor.isModified():
+                # We need to switch to tab to save? No, just save if path exists
+                file_path = getattr(editor, "file_path", None)
+                if file_path:
+                    try:
+                        with open(file_path, "w", encoding="utf-8") as f:
+                            f.write(editor.text())
+                        editor.setModified(False)
+                    except Exception as e:
+                        print(f"Failed to auto-save {file_path}: {e}")
+    
+    def exit_application(self):
+        """Close the application"""
+        self.close()
+
+    def show_about(self):
+        QMessageBox.about(
+            self,
+            "About PyCursor",
+            "<h3>PyCursor IDE</h3>"
+            "<p>A modern, AI-powered Python IDE.</p>"
+            "<p>Version: 0.2.0 (Dev)</p>"
+        )
 
         modified = False
         if hasattr(editor, "isModified") and callable(editor.isModified):

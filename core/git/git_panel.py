@@ -13,6 +13,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
 from core.ui.theme import COLORS
 from core.git.git_handler import GitHandler, GitFileStatus
+from core.utilities.worker import WorkerThread
 import os
 
 
@@ -114,11 +115,11 @@ class GitPanel(QWidget):
         self.branch_combo.currentTextChanged.connect(self.on_branch_changed)
         header_layout.addWidget(self.branch_combo)
         
-        refresh_btn = QPushButton("↻")
-        refresh_btn.setFixedSize(28, 28)
-        refresh_btn.setToolTip("Refresh")
-        refresh_btn.clicked.connect(self.refresh)
-        refresh_btn.setStyleSheet(f"""
+        self.refresh_btn = QPushButton("↻")
+        self.refresh_btn.setFixedSize(28, 28)
+        self.refresh_btn.setToolTip("Refresh")
+        self.refresh_btn.clicked.connect(self.refresh)
+        self.refresh_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS['button_bg']};
                 color: {COLORS['text_primary']};
@@ -130,7 +131,7 @@ class GitPanel(QWidget):
                 background-color: {COLORS['button_hover']};
             }}
         """)
-        header_layout.addWidget(refresh_btn)
+        header_layout.addWidget(self.refresh_btn)
         
         layout.addLayout(header_layout)
         
@@ -325,19 +326,38 @@ class GitPanel(QWidget):
         self.update_view()
     
     def refresh(self, status=None, branches=None, current_branch=None):
-        """Refresh the Git status"""
+        """Refresh the Git status asynchronously"""
         if not self.git_handler.repo:
             return
-        
+
+        # If data is provided (e.g. from background thread), update UI
+        if status is not None and branches is not None and current_branch is not None:
+            self._update_ui_with_status(status, branches, current_branch)
+            return
+
+        # Otherwise, start background task
+        self.refresh_btn.setEnabled(False)
+        self.worker = WorkerThread(self._get_git_state)
+        self.worker.result_ready.connect(self._handle_refresh_result)
+        self.worker.finished.connect(lambda: self.refresh_btn.setEnabled(True))
+        self.worker.start()
+
+    def _get_git_state(self):
+        """Helper to get full git state in background"""
+        return (
+            self.git_handler.get_status(),
+            self.git_handler.get_branches(),
+            self.git_handler.get_current_branch()
+        )
+
+    def _handle_refresh_result(self, result):
+        status, branches, current_branch = result
+        self._update_ui_with_status(status, branches, current_branch)
+
+    def _update_ui_with_status(self, status, branches, current_branch):
         # Update branches
         self.branch_combo.blockSignals(True)
         self.branch_combo.clear()
-        
-        if current_branch is None:
-            current_branch = self.git_handler.get_current_branch()
-        
-        if branches is None:
-            branches = self.git_handler.get_branches()
         
         self.branch_combo.addItems(branches)
         if current_branch:
@@ -352,9 +372,6 @@ class GitPanel(QWidget):
         
         unstaged_root = QTreeWidgetItem(self.changes_tree, ["Changes"])
         unstaged_root.setExpanded(True)
-        
-        if status is None:
-            status = self.git_handler.get_status()
         
         for file_status in status:
             icon_text = self.get_status_icon(file_status.status)
@@ -388,21 +405,33 @@ class GitPanel(QWidget):
         if not branch_name or not self.git_handler.repo:
             return
         
-        current = self.git_handler.get_current_branch()
-        if branch_name != current:
-            reply = QMessageBox.question(
-                self, "Checkout Branch",
-                f"Switch to branch '{branch_name}'?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
-                if self.git_handler.checkout_branch(branch_name):
-                    self.refresh()
-                    QMessageBox.information(self, "Success", f"Switched to branch '{branch_name}'")
-                else:
-                    QMessageBox.warning(self, "Error", f"Failed to checkout branch '{branch_name}'")
-                    self.branch_combo.setCurrentText(current)
+        # Avoid recursion if updated by code
+        # We rely on blockSignals in refresh, but robust check is good
+        current = self.branch_combo.currentText() # This might be the new one?
+        # Actually checking against cached real state in handler would be better or just let it run.
+        # But we need to confirm.
+        
+        # Simplified: Just ask user.
+        reply = QMessageBox.question(
+            self, "Checkout Branch",
+            f"Switch to branch '{branch_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.worker = WorkerThread(self.git_handler.checkout_branch, branch_name)
+            self.worker.result_ready.connect(self._handle_checkout)
+            self.worker.start()
+        else:
+            # Revert combo box
+            self.refresh() # Resets it
+
+    def _handle_checkout(self, success):
+        if success:
+            self.refresh()
+        else:
+            QMessageBox.warning(self, "Error", "Failed to checkout branch")
+            self.refresh()
     
     def show_context_menu(self, position):
         """Show context menu for file items"""
@@ -486,44 +515,52 @@ class GitPanel(QWidget):
                 self.refresh()
                 QMessageBox.information(self, "Success", "Changes discarded")
     
+    def pull(self):
+        self._run_git_op("Pull", self.git_handler.pull)
+
+    def push(self):
+        self._run_git_op("Push", self.git_handler.push)
+
+    def fetch(self):
+        self._run_git_op("Fetch", self.git_handler.fetch)
+
     def commit(self):
-        """Commit staged changes"""
-        message = self.commit_message.toPlainText().strip()
-        if not message:
-            QMessageBox.warning(self, "No Message", "Please enter a commit message")
+        msg = self.commit_message.toPlainText().strip()
+        if not msg:
+            QMessageBox.warning(self, "Error", "Commit message cannot be empty")
             return
         
-        if self.git_handler.commit(message):
+        self.commit_btn.setEnabled(False)
+        self.worker = WorkerThread(self.git_handler.commit, msg)
+        self.worker.result_ready.connect(self._handle_commit)
+        self.worker.start()
+
+    def _handle_commit(self, success):
+        self.commit_btn.setEnabled(True)
+        if success:
             self.commit_message.clear()
             self.refresh()
             QMessageBox.information(self, "Success", "Changes committed successfully")
         else:
-            QMessageBox.warning(self, "Error", "Failed to commit changes")
-    
-    def pull(self):
-        """Pull from remote"""
-        success, message = self.git_handler.pull()
+            QMessageBox.warning(self, "Error", "Commit failed")
+
+    def _run_git_op(self, name, func):
+        self.worker = WorkerThread(func)
+        self.worker.result_ready.connect(lambda s: self._handle_op_result(name, s))
+        self.worker.start()
+
+    def _handle_op_result(self, name, result):
+        # Result might be (success, message) or just success boolean depending on handler
+        success = result
+        message = ""
+        if isinstance(result, tuple):
+            success, message = result
+        
         if success:
+            QMessageBox.information(self, "Success", f"{name} successful\n{message}")
             self.refresh()
-            QMessageBox.information(self, "Success", "Pull completed successfully")
         else:
-            QMessageBox.warning(self, "Error", f"Pull failed: {message}")
-    
-    def push(self):
-        """Push to remote"""
-        success, message = self.git_handler.push()
-        if success:
-            QMessageBox.information(self, "Success", "Push completed successfully")
-        else:
-            QMessageBox.warning(self, "Error", f"Push failed: {message}")
-    
-    def fetch(self):
-        """Fetch from remote"""
-        if self.git_handler.fetch():
-            self.refresh()
-            QMessageBox.information(self, "Success", "Fetch completed successfully")
-        else:
-            QMessageBox.warning(self, "Error", "Fetch failed")
+            QMessageBox.warning(self, "Error", f"{name} failed\n{message}")
     
     def view_diff(self, file_path: str, staged: bool):
         """View diff for a file"""
