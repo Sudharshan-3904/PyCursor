@@ -14,6 +14,7 @@ from .code_linter import CodeLinter
 
 from core.ui.theme import COLORS
 from core.utilities.worker import WorkerThread
+from core.ai.context_manager import ContextManager
 
 class AIEngine(QWidget):
     def __init__(self):
@@ -43,6 +44,8 @@ class AIEngine(QWidget):
         self.docstring_generator = DocstringGenerator(style='google')
         
         self.code_linter = CodeLinter()
+        
+        self.context_manager = ContextManager()
 
         self.using_api = False
 
@@ -305,7 +308,21 @@ class AIEngine(QWidget):
         self.chat_area.append(f"<b>User:</b> {user_input}")
         self.input_field.clear()
         
-        # Prepare prompt with agent mode context if enabled
+        # 1. Retrieve Context
+        project_path = getattr(self.main_window, 'project_path', None) if hasattr(self, 'main_window') else None
+        self.context_manager.set_project_path(project_path)
+        
+        context_data = self.context_manager.get_context(user_input)
+        context_text = context_data.get("text", "")
+        used_files = context_data.get("files", [])
+        
+        if used_files:
+            file_list_str = ", ".join([f"<code>{f}</code>" for f in used_files])
+            self.chat_area.append(f"<i>Reading context from: {file_list_str}</i>")
+        
+        # 2. Build Prompt
+        prompt_parts = []
+        
         if self.agent_mode:
             system_context = """You are an AI agent with file system access. You can:
 - Read files: Use <read_file>path/to/file.py</read_file>
@@ -315,10 +332,14 @@ class AIEngine(QWidget):
 
 When the user asks you to work with files, use these tags in your response.
 For code edits, use <<<edit>>> tags as usual."""
+            prompt_parts.append(system_context)
+        
+        if context_text:
+            prompt_parts.append(context_text)
             
-            full_prompt = f"{system_context}\n\nUser request: {user_input}"
-        else:
-            full_prompt = user_input
+        prompt_parts.append(f"User request: {user_input}")
+        
+        full_prompt = "\n\n".join(prompt_parts)
 
         if self.using_api:
             model_identifier = next(iter(self.models.values()), "default")
@@ -339,9 +360,6 @@ For code edits, use <<<edit>>> tags as usual."""
         self.worker.start()
 
     def handle_ai_response(self, response):
-        # Remove "Processing..." line if possible, or just append
-        # For simplicity, we just append the result
-        
         # Handle agent mode file operations
         if self.agent_mode:
             response = self.process_agent_commands(response)
