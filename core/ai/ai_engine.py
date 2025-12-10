@@ -1,14 +1,11 @@
 import sys
-import os
-import time
-from datetime import datetime
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QMenu,
     QTextEdit, QPushButton, QLineEdit, QInputDialog, QMessageBox
 )
 from PyQt6.QtGui import QAction
 
-from ..utils import load_icon
+from ..utilities.utils import load_icon
 from .local_model_handler import LocalModelHandler
 from .api_model_handler import APIModelHandler, APIConfig
 from .docstring_generator import DocstringGenerator
@@ -16,6 +13,7 @@ from .code_linter import CodeLinter
 
 
 from core.ui.theme import COLORS
+from core.utilities.worker import WorkerThread
 
 class AIEngine(QWidget):
     def __init__(self):
@@ -32,16 +30,12 @@ class AIEngine(QWidget):
 
         self.local_model_handler = LocalModelHandler()
 
-        self.models = self.local_model_handler.detect_models()
-        self.current_model_name = next(iter(self.models.keys()), None)
-        self.current_backend = (
-            "lmstudio" if self.current_model_name and self.current_model_name.startswith("LM Studio") else "ollama"
-        )
+        self.models = {}
+        self.current_model_name = None
+        self.current_backend = "ollama"
 
         self.local_model_handler.backend = self.current_backend
-        self.local_model_handler.model_name = (
-            self.current_model_name.split(": ", 1)[-1] if self.current_model_name else None
-        )
+        self.local_model_handler.model_name = None
 
         self.api_model_handler = APIModelHandler()
         self.api_config = None
@@ -101,7 +95,37 @@ class AIEngine(QWidget):
         self.api_local_btn.setCheckable(True)
         self.api_local_btn.setFixedHeight(28)
         self.api_local_btn.clicked.connect(self.toggle_api_local)
+        self.api_local_btn.setToolTip("Toggle between Local and API models")
         toolbar_layout.addWidget(self.api_local_btn)
+        
+        # Agent mode toggle
+        self.agent_mode = False
+        self.agent_mode_btn = QPushButton("Agent")
+        self.agent_mode_btn.setCheckable(True)
+        self.agent_mode_btn.setFixedHeight(28)
+        self.agent_mode_btn.setChecked(False)
+        self.agent_mode_btn.clicked.connect(self.toggle_agent_mode)
+        self.agent_mode_btn.setToolTip("Enable Agent Mode (AI can read/write files)")
+        self.agent_mode_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['bg_tertiary']};
+                color: {COLORS['text_secondary']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 11px;
+            }}
+            QPushButton:checked {{
+                background-color: {COLORS['accent_green']};
+                color: {COLORS['bg_primary']};
+                border: 1px solid {COLORS['accent_green']};
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_elevated']};
+            }}
+        """)
+        toolbar_layout.addWidget(self.agent_mode_btn)
 
         self.model_btn = QPushButton()
         self.model_btn.setIcon(self.model_icon)
@@ -125,6 +149,18 @@ class AIEngine(QWidget):
         main_layout.addLayout(toolbar_layout)
 
         self.setLayout(main_layout)
+
+
+    def update_models(self, models: dict):
+        """Update the list of available models"""
+        self.models = models
+        
+        # Set default if not set
+        if not self.current_model_name and self.models:
+            self.current_model_name = next(iter(self.models.keys()), None)
+            self.on_model_change(self.current_model_name)
+            
+        self.populate_model_menu()
 
     def populate_model_menu(self):
         self.model_menu.clear()
@@ -211,6 +247,15 @@ class AIEngine(QWidget):
         else:
             self.api_local_btn.setIcon(self.local_icon)
             self.api_local_btn.setToolTip("Using Local models")
+    
+    def toggle_agent_mode(self):
+        """Toggle agent mode on/off"""
+        self.agent_mode = self.agent_mode_btn.isChecked()
+        if self.agent_mode:
+            self.chat_area.append("<i>[Agent Mode ENABLED - AI can now read, create, and write files]</i>")
+        else:
+            self.chat_area.append("<i>[Agent Mode DISABLED - AI responses only]</i>")
+
 
     def api_model_response(self, prompt, model_identifier):
         """Generate response using API models"""
@@ -257,14 +302,47 @@ class AIEngine(QWidget):
 
         self.chat_area.append(f"<b>User:</b> {user_input}")
         self.input_field.clear()
+        
+        # Prepare prompt with agent mode context if enabled
+        if self.agent_mode:
+            system_context = """You are an AI agent with file system access. You can:
+- Read files: Use <read_file>path/to/file.py</read_file>
+- Write files: Use <write_file path="path/to/file.py">content here</write_file>
+- Create files: Use <create_file path="path/to/file.py">content here</create_file>
+- List directory: Use <list_dir>path/to/directory</list_dir>
+
+When the user asks you to work with files, use these tags in your response.
+For code edits, use <<<edit>>> tags as usual."""
+            
+            full_prompt = f"{system_context}\n\nUser request: {user_input}"
+        else:
+            full_prompt = user_input
 
         if self.using_api:
             model_identifier = next(iter(self.models.values()), "default")
-            response = self.api_model_response(user_input, model_identifier)
+            # Create worker for API
+            self.worker = WorkerThread(self.api_model_response, full_prompt, model_identifier)
         else:
-            response = self.run_model(user_input)
+            # Create worker for Local
+            self.worker = WorkerThread(self.run_model, full_prompt)
+        
+        self.worker.result_ready.connect(self.handle_ai_response)
+        self.worker.error_occurred.connect(self.handle_ai_error)
+        self.worker.finished.connect(self.on_worker_finished)
+        
+        self.send_btn.setEnabled(False)
+        self.input_field.setEnabled(False)
+        self.chat_area.append("<i>Processing...</i>")
+        
+        self.worker.start()
 
-        print("Model Response:", response)
+    def handle_ai_response(self, response):
+        # Remove "Processing..." line if possible, or just append
+        # For simplicity, we just append the result
+        
+        # Handle agent mode file operations
+        if self.agent_mode:
+            response = self.process_agent_commands(response)
 
         if self._contains_edit_tags(response):
             try:
@@ -272,20 +350,109 @@ class AIEngine(QWidget):
                 self.chat_area.append("<i>[AI wrote changes to the editor]</i>")
             except Exception as e:
                 self.chat_area.append(f"<i>[Failed to apply response to editor: {e}]</i>")
-            return
-
-        self.chat_area.append(f"<b>AI:</b> {response}\n")
+        else:
+            self.chat_area.append(f"<b>AI:</b> {response}\n")
+            
         self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum())
 
-    def apply_response_to_editor(self, response: str):
-        print("Full AI Response:\n", repr(response))
+    def handle_ai_error(self, error_msg):
+        self.chat_area.append(f"<span style='color:red'>Error: {error_msg}</span>")
 
+    def on_worker_finished(self):
+        self.send_btn.setEnabled(True)
+        self.input_field.setEnabled(True)
+        self.input_field.setFocus()
+
+    def process_agent_commands(self, response: str) -> str:
+        """Process agent mode file operation commands"""
+        import os
+        import re
+        
+        modified_response = response
+        
+        # Handle read_file
+        read_pattern = r'<read_file>(.*?)</read_file>'
+        for match in re.finditer(read_pattern, response):
+            file_path = match.group(1).strip()
+            try:
+                # Get project path
+                project_path = getattr(self.main_window, 'project_path', os.getcwd()) if hasattr(self, 'main_window') else os.getcwd()
+                full_path = os.path.join(project_path, file_path) if not os.path.isabs(file_path) else file_path
+                
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                self.chat_area.append(f"<i>[Read file: {file_path}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"\n```\n{content}\n```\n")
+            except Exception as e:
+                self.chat_area.append(f"<i>[Error reading {file_path}: {e}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"[Error: {e}]")
+        
+        # Handle write_file
+        write_pattern = r'<write_file path="(.*?)">(.*?)</write_file>'
+        for match in re.finditer(write_pattern, response, re.DOTALL):
+            file_path = match.group(1).strip()
+            content = match.group(2).strip()
+            try:
+                project_path = getattr(self.main_window, 'project_path', os.getcwd()) if hasattr(self, 'main_window') else os.getcwd()
+                full_path = os.path.join(project_path, file_path) if not os.path.isabs(file_path) else file_path
+                
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                self.chat_area.append(f"<i>[✓ Wrote to file: {file_path}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"[File written: {file_path}]")
+            except Exception as e:
+                self.chat_area.append(f"<i>[Error writing {file_path}: {e}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"[Error: {e}]")
+        
+        # Handle create_file
+        create_pattern = r'<create_file path="(.*?)">(.*?)</create_file>'
+        for match in re.finditer(create_pattern, response, re.DOTALL):
+            file_path = match.group(1).strip()
+            content = match.group(2).strip()
+            try:
+                project_path = getattr(self.main_window, 'project_path', os.getcwd()) if hasattr(self, 'main_window') else os.getcwd()
+                full_path = os.path.join(project_path, file_path) if not os.path.isabs(file_path) else file_path
+                
+                # Create directory if it doesn't exist
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                self.chat_area.append(f"<i>[✓ Created file: {file_path}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"[File created: {file_path}]")
+            except Exception as e:
+                self.chat_area.append(f"<i>[Error creating {file_path}: {e}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"[Error: {e}]")
+        
+        # Handle list_dir
+        list_pattern = r'<list_dir>(.*?)</list_dir>'
+        for match in re.finditer(list_pattern, response):
+            dir_path = match.group(1).strip()
+            try:
+                project_path = getattr(self.main_window, 'project_path', os.getcwd()) if hasattr(self, 'main_window') else os.getcwd()
+                full_path = os.path.join(project_path, dir_path) if not os.path.isabs(dir_path) else dir_path
+                
+                items = os.listdir(full_path)
+                items_str = "\n".join(f"  - {item}" for item in sorted(items))
+                
+                self.chat_area.append(f"<i>[Listed directory: {dir_path}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"\nDirectory contents:\n{items_str}\n")
+            except Exception as e:
+                self.chat_area.append(f"<i>[Error listing {dir_path}: {e}]</i>")
+                modified_response = modified_response.replace(match.group(0), f"[Error: {e}]")
+        
+        return modified_response
+
+
+    def apply_response_to_editor(self, response: str):
         if "<<<edit>>>" in response and "<<</edit>>>" in response:
             start = response.find("<<<edit>>>") + len("<<<edit>>>")
             end = response.find("<<</edit>>>")
 
             extracted = response[start:end].strip()
-            print("Extracted Code to Apply:\n", repr(extracted))
         else:
             extracted = response.strip()
 
@@ -322,8 +489,6 @@ class AIEngine(QWidget):
             new_content = current + "\n" + extracted
         else:
             new_content = current + extracted
-
-        print("New Content to Apply to Editor:\n", repr(new_content))
 
         if hasattr(editor, "setPlainText"):
             editor.setPlainText(new_content)

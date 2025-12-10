@@ -6,7 +6,7 @@ from PyQt6.QtGui import QFileSystemModel, QAction
 from PyQt6.QtCore import pyqtSignal, QModelIndex, QSortFilterProxyModel
 
 import os
-from core.utils import load_icon
+from core.utilities.utils import load_icon
 
 
 class SideBar(QWidget):

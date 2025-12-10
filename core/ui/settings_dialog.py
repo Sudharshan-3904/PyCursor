@@ -80,6 +80,25 @@ class SettingsDialog(QDialog):
         
         tabs.addTab(api_tab, "AI Configuration")
         
+        # Keybindings tab
+        keybindings_tab = QWidget()
+        kb_layout = QVBoxLayout()
+        kb_layout.setContentsMargins(20, 20, 20, 20)
+        kb_layout.setSpacing(15)
+        
+        kb_label = QLabel("Customize keyboard shortcuts for PyCursor IDE")
+        kb_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 12px;")
+        kb_layout.addWidget(kb_label)
+        
+        kb_btn = QPushButton("Edit Keyboard Shortcuts")
+        kb_btn.setMaximumWidth(200)
+        kb_btn.clicked.connect(self.open_keybindings_dialog)
+        kb_layout.addWidget(kb_btn)
+        
+        kb_layout.addStretch()
+        keybindings_tab.setLayout(kb_layout)
+        tabs.addTab(keybindings_tab, "Keybindings")
+        
         general_tab = QWidget()
         gen_layout = QVBoxLayout()
         gen_layout.addWidget(QLabel("General settings coming soon..."))
@@ -129,3 +148,12 @@ class SettingsDialog(QDialog):
             self.accept()
         else:
             QMessageBox.warning(self, "Error", "Failed to configure API. Check logs.")
+    
+    def open_keybindings_dialog(self):
+        """Open the keybindings editor dialog"""
+        from core.ui.keybindings_dialog import KeybindingsDialog
+        from core.utilities.keybindings import KeyBindingsManager
+        
+        keybindings_manager = KeyBindingsManager()
+        dialog = KeybindingsDialog(self, keybindings_manager)
+        dialog.exec()

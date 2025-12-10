@@ -1,6 +1,6 @@
 import requests
 import subprocess
-from core.utils import load_systemPrompt
+from core.utilities.utils import load_systemPrompt
 
 
 
