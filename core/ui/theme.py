@@ -10,10 +10,12 @@ COLORS = {
     'bg_tertiary': '#11111b',     # Title bar/Deep background (Mocha Crust)
     'bg_elevated': '#313244',     # Input fields, hover states (Mocha Surface0)
     'bg_selection': '#45475a',    # Selection background (Mocha Surface1)
+    'bg_input': '#11111b',        # Specific input background (matches bg_tertiary)
     
     # Text
     'text_primary': '#cdd6f4',    # Main text (Text)
     'text_secondary': '#a6adc8',  # Subtext (Subtext0)
+    'text_tertiary': '#6c7086',   # Tertiary text (same as disabled for now)
     'text_disabled': '#6c7086',   # Disabled text (Overlay0)
     'text_highlight': '#ffffff',  # Highlighted text
     

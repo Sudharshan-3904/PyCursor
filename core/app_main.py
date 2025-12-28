@@ -31,6 +31,8 @@ from core.ui.keybindings_dialog import KeybindingsDialog
 from core.ui.log_panel import LogPanel
 from core.ide.editor_manager import EditorManager
 from core.ui.menu_manager import MenuManager
+from core.ui.extensions_panel import ExtensionsPanel
+from core.ui.search_panel import SearchPanel
 
 
 class StartupThread(QThread):
@@ -99,6 +101,15 @@ class PyCursorMain(QMainWindow):
         # 3. Logs Panel
         self.log_panel = LogPanel()
         self.sidebar_stack.addWidget(self.log_panel)
+
+        # 4. Extensions Panel
+        self.extensions_panel = ExtensionsPanel(self)
+        self.sidebar_stack.addWidget(self.extensions_panel)
+
+        # 5. Search Panel
+        self.search_panel = SearchPanel(root_path=self.project_path)
+        self.search_panel.file_selected.connect(self.open_file_in_tab)
+        self.sidebar_stack.addWidget(self.search_panel)
 
         self.sidebar_dock = QDockWidget("EXPLORER", self)
         self.sidebar_dock.setWidget(self.sidebar_stack)
@@ -216,6 +227,12 @@ class PyCursorMain(QMainWindow):
         git_action.triggered.connect(lambda: self.toggle_view("git"))
         activity_bar.addAction(git_action)
         self.git_action = git_action
+
+        extensions_action = QAction(load_icon("extensions.svg"), "Extensions", self) # Use puzzle icon if extensions.svg missing
+        extensions_action.setCheckable(True)
+        extensions_action.triggered.connect(lambda: self.toggle_view("extensions"))
+        activity_bar.addAction(extensions_action)
+        self.extensions_action = extensions_action
         
         logs_action = QAction(load_icon("output.svg"), "App Logs", self) # Assuming output.svg exists or uses fallback
         logs_action.setCheckable(True)
@@ -245,6 +262,7 @@ class PyCursorMain(QMainWindow):
             "search": self.search_action,
             "git": self.git_action,
             "logs": self.logs_action,
+            "extensions": self.extensions_action,
         }
         
         if view_name in sidebar_actions:
@@ -284,10 +302,14 @@ class PyCursorMain(QMainWindow):
                     elif view_name == "logs":
                         self.sidebar_stack.setCurrentIndex(2)
                         self.sidebar_dock.setWindowTitle("APP LOGS")
+                    elif view_name == "extensions":
+                        self.sidebar_stack.setCurrentIndex(3)
+                        self.sidebar_dock.setWindowTitle("EXTENSIONS")
                     elif view_name == "search":
-                        # self.sidebar_stack.setCurrentIndex(2)
+                        self.sidebar_stack.setCurrentIndex(4)
                         self.sidebar_dock.setWindowTitle("SEARCH")
-                        pass
+                        if self.project_path:
+                            self.search_panel.set_project_path(self.project_path)
             else:
                 self.sidebar_dock.setVisible(False)
                 current_action.setProperty("was_active", False)
@@ -322,6 +344,7 @@ class PyCursorMain(QMainWindow):
         self.status_encoding_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
         status_bar.addWidget(self.status_encoding_label)
         
+        self.status_language_label = QLabel("Plain Text")
         self.status_language_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
         status_bar.addWidget(self.status_language_label)
         
@@ -402,8 +425,17 @@ class PyCursorMain(QMainWindow):
                 term.set_project_path(folder)
 
     # Delegated methods for potential external calls (like from Sidebar)
-    def open_file_in_tab(self, file_path: str):
+    def open_file_in_tab(self, file_path: str, line_number: int = None):
         self.editor_manager.open_file(file_path)
+        if line_number is not None:
+             editor = self.get_current_editor()
+             if editor:
+                 cursor = editor.textCursor()
+                 cursor.movePosition(cursor.MoveOperation.Start)
+                 cursor.movePosition(cursor.MoveOperation.Down, cursor.MoveMode.MoveAnchor, line_number - 1)
+                 editor.setTextCursor(cursor)
+                 editor.centerCursor()
+                 editor.setFocus()
 
     def save_file(self):
         self.editor_manager.save_current_file()
