@@ -37,6 +37,7 @@ from core.ui.search_panel import SearchPanel
 from core.env.env_manager import EnvironmentManager
 from core.env.dependency_manager import DependencyManager
 from core.ui.env_dialogs import EnvironmentSelectionDialog
+from core.plugins.plugin_manager import PluginManager
 
 
 class StartupThread(QThread):
@@ -78,13 +79,12 @@ class PyCursorMain(QMainWindow):
         self.setWindowTitle("PyCursor IDE")
         self.resize(1400, 900)
         
-        self.setStyleSheet(get_stylesheet())
-
         self.settings_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             "config", "settings.json"
         )
         self._settings = self._load_settings()
+        self.apply_theme(self._settings.get("theme", "dark"))
         self.project_path = self._settings.get("last_open_folder", os.getcwd())
 
         self.editor_tabs = QTabWidget()
@@ -147,6 +147,10 @@ class PyCursorMain(QMainWindow):
         self.env_manager = EnvironmentManager(self.project_path)
         self.dep_manager = DependencyManager(self.project_path)
         
+        # Initialize Plugins
+        self.plugin_manager = PluginManager(self)
+        self.plugin_manager.load_all_plugins()
+        
         self.create_status_bar()
         self.update_env_status()
         
@@ -161,6 +165,16 @@ class PyCursorMain(QMainWindow):
         self.startup_thread.models_ready.connect(self.on_models_loaded)
         self.startup_thread.git_ready.connect(self.on_git_ready)
         self.startup_thread.start()
+
+    def apply_theme(self, theme_name):
+        """Apply the selected theme (dark/light) to the application"""
+        self.setStyleSheet(get_stylesheet(theme=theme_name))
+        # Update editors if any are open
+        if hasattr(self, 'editor_manager'):
+             for i in range(self.editor_tabs.count()):
+                 editor = self.editor_tabs.widget(i)
+                 if hasattr(editor, 'refresh_theme'):
+                     editor.refresh_theme(theme_name)
 
         # Show welcome screen if first time
         QTimer.singleShot(500, self.show_welcome_screen)

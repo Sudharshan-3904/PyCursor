@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QMenu
 from PyQt6.QtGui import QColor, QFont, QAction
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython
-from core.ui.theme import COLORS
+from core.ui.theme import COLORS, LIGHT_COLORS
 
 class CodeEditor(QsciScintilla):
     git_blame_requested = pyqtSignal(str)
@@ -11,59 +11,15 @@ class CodeEditor(QsciScintilla):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        font = QFont("Consolas", 11)
-        self.setFont(font)
-        self.setMarginsFont(font)
-
-        lexer = QsciLexerPython()
-        lexer.setDefaultFont(font)
-
-        editor_bg = QColor(COLORS['editor_bg'])
-        self.setPaper(editor_bg)
-        lexer.setPaper(editor_bg)
-
-        lexer.setDefaultColor(QColor(COLORS['text_primary']))
-        
-        lexer.setColor(QColor("#569cd6"), QsciLexerPython.Keyword)
-        lexer.setColor(QColor("#ce9178"), QsciLexerPython.SingleQuotedString)
-        lexer.setColor(QColor("#ce9178"), QsciLexerPython.DoubleQuotedString)
-        lexer.setColor(QColor("#b5cea8"), QsciLexerPython.Number)
-        lexer.setColor(QColor("#d4d4d4"), QsciLexerPython.Operator)
-        lexer.setColor(QColor("#4ec9b0"), QsciLexerPython.ClassName)
-        lexer.setColor(QColor("#dcdcaa"), QsciLexerPython.FunctionMethodName)
-        lexer.setColor(QColor("#dcdcaa"), QsciLexerPython.Decorator)
-        lexer.setColor(QColor("#6a9955"), QsciLexerPython.Comment)
-        lexer.setColor(QColor("#ce9178"), QsciLexerPython.TripleSingleQuotedString)
-        lexer.setColor(QColor("#ce9178"), QsciLexerPython.TripleDoubleQuotedString)
-
-        self.setLexer(lexer)
+        self.setup_lexer()
+        self.apply_theme_colors()
 
         self.setIndentationWidth(4)
         self.setIndentationsUseTabs(False)
         self.setTabWidth(4)
         self.setAutoIndent(True)
 
-        transparent = QColor(0, 0, 0, 0)
-        fg = QColor(COLORS['text_secondary'])
-        
         self.setMarginWidth(0, "0000")
-        self.setMarginsBackgroundColor(QColor(COLORS['editor_bg']))
-        self.setMarginsForegroundColor(fg)
-
-        self.setFolding(QsciScintilla.FoldStyle.BoxedTreeFoldStyle)
-        self.setFoldMarginColors(QColor(COLORS['editor_bg']), QColor(COLORS['editor_bg']))
-
-        self.SendScintilla(QsciScintilla.SCI_SETFOLDFLAGS, 0)
-
-        self.setCaretForegroundColor(QColor(COLORS['editor_cursor']))
-        self.setCaretWidth(2)
-        
-        self.setSelectionBackgroundColor(QColor(COLORS['editor_selection']))
-        self.setSelectionForegroundColor(QColor(COLORS['text_highlight']))
-
-        self.setEdgeMode(QsciScintilla.EdgeMode.EdgeBackground)
-        self.setEdgeColumn(80)
-        self.setEdgeColor(QColor(COLORS['bg_tertiary']))
 
         self.setBraceMatching(QsciScintilla.BraceMatch.SloppyBraceMatch)
 
@@ -108,3 +64,48 @@ class CodeEditor(QsciScintilla):
     def request_history(self):
         if hasattr(self, 'file_path') and self.file_path:
             self.git_history_requested.emit(self.file_path)
+
+    def setup_lexer(self):
+        font = QFont("Consolas", 11)
+        self.setFont(font)
+        self.setMarginsFont(font)
+        
+        lexer = QsciLexerPython()
+        lexer.setDefaultFont(font)
+        # Standard colors that look okay on both
+        lexer.setColor(QColor("#569cd6"), QsciLexerPython.Keyword)
+        lexer.setColor(QColor("#ce9178"), QsciLexerPython.SingleQuotedString)
+        lexer.setColor(QColor("#699856"), QsciLexerPython.Comment)
+        self.setLexer(lexer)
+
+    def apply_theme_colors(self, theme='dark'):
+        theme_colors = COLORS if theme == 'dark' else LIGHT_COLORS
+        bg = QColor(theme_colors['editor_bg'])
+        fg = QColor(theme_colors['text_primary'])
+        
+        self.setPaper(bg)
+        if self.lexer():
+            self.lexer().setPaper(bg)
+            self.lexer().setDefaultColor(fg)
+            # Adjust syntax colors for light mode if needed
+            if theme == 'light':
+                self.lexer().setColor(QColor("#0000ff"), QsciLexerPython.Keyword)
+                self.lexer().setColor(QColor("#a31515"), QsciLexerPython.SingleQuotedString)
+                self.lexer().setColor(QColor("#008000"), QsciLexerPython.Comment)
+            else:
+                self.lexer().setColor(QColor("#569cd6"), QsciLexerPython.Keyword)
+                self.lexer().setColor(QColor("#ce9178"), QsciLexerPython.SingleQuotedString)
+                self.lexer().setColor(QColor("#6a9955"), QsciLexerPython.Comment)
+
+        self.setMarginsBackgroundColor(bg)
+        self.setMarginsForegroundColor(QColor(theme_colors['text_secondary']))
+        self.setFolding(QsciScintilla.FoldStyle.BoxedTreeFoldStyle)
+        self.setFoldMarginColors(bg, bg)
+        
+        self.setCaretForegroundColor(QColor(theme_colors['editor_cursor']))
+        self.setSelectionBackgroundColor(QColor(theme_colors['editor_selection']))
+        self.setSelectionForegroundColor(QColor(theme_colors['text_highlight']))
+        self.setEdgeColor(QColor(theme_colors['bg_tertiary']))
+
+    def refresh_theme(self, theme_name):
+        self.apply_theme_colors(theme_name)

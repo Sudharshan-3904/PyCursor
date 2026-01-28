@@ -60,29 +60,87 @@ COLORS = {
     'text_dim': '#6c7086', # Muted text
 }
 
-def get_stylesheet():
+LIGHT_COLORS = {
+    # Backgrounds
+    'bg_primary': '#eff1f5',      # Main editor background (Latte Base)
+    'bg_secondary': '#e6e9ef',    # Sidebar/Terminal background (Latte Mantle)
+    'bg_tertiary': '#dce0e8',     # Title bar/Deep background (Latte Crust)
+    'bg_elevated': '#ccd0da',     # Input fields, hover states (Latte Surface0)
+    'bg_selection': '#acb0be',    # Selection background (Latte Surface1)
+    'bg_input': '#dce0e8',
+    
+    # Text
+    'text_primary': '#4c4f69',    # Main text (Text)
+    'text_secondary': '#5c5f77',  # Subtext (Subtext0)
+    'text_tertiary': '#9ca0b0',
+    'text_disabled': '#9ca0b0',
+    'text_highlight': '#1e66f5',
+    
+    # Accents
+    'accent_blue': '#1e66f5',     # Primary Accent (Blue)
+    'accent_purple': '#8839ef',   # AI/Special (Mauve)
+    'accent_green': '#40a02b',    # Success
+    'accent_orange': '#fe640b',   # Warning
+    'accent_red': '#d20f39',      # Error
+    'accent_yellow': '#df8e1d',   # Info
+    
+    # Components
+    'border': '#ccd0da',
+    'border_light': '#bcc0cc',
+    'border_focus': '#1e66f5',
+    
+    'button_bg': '#ccd0da',
+    'button_hover': '#bcc0cc',
+    'button_pressed': '#eff1f5',
+    'button_active': '#eff1f5',
+    
+    'tab_active_bg': '#eff1f5',
+    'tab_inactive_bg': '#e6e9ef',
+    'tab_hover_bg': '#eff1f5',
+    
+    'statusbar_bg': '#1e66f5',
+    'statusbar_text': '#eff1f5',
+    
+    # Editor specifics
+    'editor_bg': '#eff1f5',
+    'editor_line_bg': '#e6e9ef',
+    'editor_selection': '#acb0be',
+    'editor_cursor': '#dc8a78',   # Rosewater
+    
+    'sidebar_bg': '#e6e9ef',
+    'sidebar_hover': '#ccd0da',
+    'sidebar_selected': '#acb0be',
+    'list_hover': '#ccd0da',
+    'list_selected': '#acb0be',
+
+    'accent_blue_hover': '#7287fd', # Lavender
+    'text_dim': '#9ca0b0',
+}
+
+def get_stylesheet(theme='dark'):
     """Get the complete stylesheet for PyCursor IDE with animations and glass-like feel"""
+    theme_colors = COLORS if theme == 'dark' else LIGHT_COLORS
     return f"""
     /* ===== GLOBAL STYLES ===== */
     QMainWindow {{
-        background-color: {COLORS['bg_primary']};
-        color: {COLORS['text_primary']};
+        background-color: {theme_colors['bg_primary']};
+        color: {theme_colors['text_primary']};
     }}
     
     QWidget {{
-        background-color: {COLORS['bg_primary']};
-        color: {COLORS['text_primary']};
+        background-color: {theme_colors['bg_primary']};
+        color: {theme_colors['text_primary']};
         font-family: 'Segoe UI', 'SF Pro Display', 'Inter', 'Roboto', sans-serif;
         font-size: 13px;
-        selection-background-color: {COLORS['accent_blue']};
-        selection-color: {COLORS['bg_primary']};
+        selection-background-color: {theme_colors['accent_blue']};
+        selection-color: {theme_colors['bg_primary']};
     }}
     
     /* ===== MENU BAR ===== */
     QMenuBar {{
-        background-color: {COLORS['bg_secondary']};
-        color: {COLORS['text_primary']};
-        border-bottom: 1px solid {COLORS['border']};
+        background-color: {theme_colors['bg_secondary']};
+        color: {theme_colors['text_primary']};
+        border-bottom: 1px solid {theme_colors['border']};
         padding: 4px;
     }}
     
@@ -94,14 +152,14 @@ def get_stylesheet():
     }}
     
     QMenuBar::item:selected {{
-        background-color: {COLORS['bg_elevated']};
-        color: {COLORS['text_highlight']};
+        background-color: {theme_colors['bg_elevated']};
+        color: {theme_colors['text_highlight']};
     }}
     
     QMenu {{
-        background-color: {COLORS['bg_secondary']};
-        color: {COLORS['text_primary']};
-        border: 1px solid {COLORS['border_light']};
+        background-color: {theme_colors['bg_secondary']};
+        color: {theme_colors['text_primary']};
+        border: 1px solid {theme_colors['border_light']};
         border-radius: 6px;
         padding: 5px;
     }}
@@ -112,32 +170,32 @@ def get_stylesheet():
     }}
     
     QMenu::item:selected {{
-        background-color: {COLORS['accent_blue']};
-        color: {COLORS['bg_primary']};
+        background-color: {theme_colors['accent_blue']};
+        color: {theme_colors['bg_primary']};
     }}
     
     QMenu::separator {{
         height: 1px;
-        background-color: {COLORS['border']};
+        background-color: {theme_colors['border']};
         margin: 4px 8px;
     }}
     
     /* ===== TAB WIDGET ===== */
     QTabWidget::pane {{
         border: none;
-        background-color: {COLORS['bg_primary']};
-        border-top: 1px solid {COLORS['border']};
+        background-color: {theme_colors['bg_primary']};
+        border-top: 1px solid {theme_colors['border']};
     }}
     
     QTabBar {{
-        background-color: {COLORS['bg_secondary']};
-        border-bottom: 1px solid {COLORS['border']};
+        background-color: {theme_colors['bg_secondary']};
+        border-bottom: 1px solid {theme_colors['border']};
         qproperty-drawBase: 0;
     }}
     
     QTabBar::tab {{
         background-color: transparent;
-        color: {COLORS['text_secondary']};
+        color: {theme_colors['text_secondary']};
         padding: 8px 16px;
         margin-right: 1px;
         border: none;
@@ -146,96 +204,81 @@ def get_stylesheet():
     }}
     
     QTabBar::tab:selected {{
-        background-color: {COLORS['bg_primary']};
-        color: {COLORS['accent_blue']};
-        border-top: 2px solid {COLORS['accent_blue']};
+        background-color: {theme_colors['bg_primary']};
+        color: {theme_colors['accent_blue']};
+        border-top: 2px solid {theme_colors['accent_blue']};
     }}
     
     QTabBar::tab:hover:!selected {{
-        background-color: {COLORS['bg_elevated']};
-        color: {COLORS['text_primary']};
-    }}
-    
-    QTabBar::close-button {{
-        image: url(none); /* We use custom close buttons in code, but standardizing just in case */
+        background-color: {theme_colors['bg_elevated']};
+        color: {theme_colors['text_primary']};
     }}
     
     /* ===== DOCK WIDGETS ===== */
     QDockWidget {{
         titlebar-close-icon: url(none);
         titlebar-normal-icon: url(none);
-        color: {COLORS['text_primary']};
+        color: {theme_colors['text_primary']};
         border: none;
     }}
     
     QDockWidget::title {{
-        background-color: {COLORS['bg_secondary']};
-        color: {COLORS['text_secondary']};
+        background-color: {theme_colors['bg_secondary']};
+        color: {theme_colors['text_secondary']};
         padding: 8px 12px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-size: 11px;
-        border-bottom: 1px solid {COLORS['border']};
+        border-bottom: 1px solid {theme_colors['border']};
     }}
     
     /* ===== BUTTONS ===== */
     QPushButton {{
-        background-color: {COLORS['button_bg']};
-        color: {COLORS['text_primary']};
-        border: 1px solid {COLORS['border']};
+        background-color: {theme_colors['button_bg']};
+        color: {theme_colors['text_primary']};
+        border: 1px solid {theme_colors['border']};
         border-radius: 5px;
         padding: 6px 12px;
         font-weight: 500;
     }}
     
     QPushButton:hover {{
-        background-color: {COLORS['button_hover']};
-        border: 1px solid {COLORS['border_light']};
+        background-color: {theme_colors['button_hover']};
+        border: 1px solid {theme_colors['border_light']};
     }}
     
     QPushButton:pressed {{
-        background-color: {COLORS['accent_blue']};
-        color: {COLORS['bg_primary']};
-        border-color: {COLORS['accent_blue']};
+        background-color: {theme_colors['accent_blue']};
+        color: {theme_colors['bg_primary']};
+        border-color: {theme_colors['accent_blue']};
     }}
     
     QPushButton:disabled {{
-        background-color: {COLORS['bg_secondary']};
-        color: {COLORS['text_disabled']};
-        border-color: {COLORS['border']};
-    }}
-    
-    /* Primary Action Button (e.g. Commit) */
-    QPushButton[class="primary"] {{
-        background-color: {COLORS['accent_blue']};
-        color: {COLORS['bg_primary']};
-        border: none;
-    }}
-    
-    QPushButton[class="primary"]:hover {{
-        background-color: {COLORS['accent_blue_hover']};
+        background-color: {theme_colors['bg_secondary']};
+        color: {theme_colors['text_disabled']};
+        border-color: {theme_colors['border']};
     }}
     
     /* ===== INPUT FIELDS ===== */
     QTextEdit, QPlainTextEdit, QLineEdit {{
-        background-color: {COLORS['bg_tertiary']};
-        color: {COLORS['text_primary']};
-        border: 1px solid {COLORS['border']};
+        background-color: {theme_colors['bg_tertiary']};
+        color: {theme_colors['text_primary']};
+        border: 1px solid {theme_colors['border']};
         border-radius: 4px;
         padding: 6px;
-        selection-background-color: {COLORS['bg_selection']};
+        selection-background-color: {theme_colors['bg_selection']};
     }}
     
     QTextEdit:focus, QPlainTextEdit:focus, QLineEdit:focus {{
-        border: 1px solid {COLORS['border_focus']};
-        background-color: {COLORS['bg_primary']};
+        border: 1px solid {theme_colors['border_focus']};
+        background-color: {theme_colors['bg_primary']};
     }}
     
     /* ===== SIDEBAR / TREE VIEW ===== */
     QTreeView {{
-        background-color: {COLORS['sidebar_bg']};
-        color: {COLORS['text_primary']};
+        background-color: {theme_colors['sidebar_bg']};
+        color: {theme_colors['text_primary']};
         border: none;
         outline: none;
     }}
@@ -247,17 +290,13 @@ def get_stylesheet():
     }}
     
     QTreeView::item:hover {{
-        background-color: {COLORS['sidebar_hover']};
+        background-color: {theme_colors['sidebar_hover']};
     }}
     
     QTreeView::item:selected {{
-        background-color: {COLORS['sidebar_selected']};
-        color: {COLORS['text_highlight']};
-        border-left: 2px solid {COLORS['accent_blue']};
-    }}
-    
-    QTreeView::branch {{
-        background-color: transparent;
+        background-color: {theme_colors['sidebar_selected']};
+        color: {theme_colors['text_highlight']};
+        border-left: 2px solid {theme_colors['accent_blue']};
     }}
     
     /* ===== SCROLL BARS ===== */
@@ -268,125 +307,50 @@ def get_stylesheet():
     }}
     
     QScrollBar::handle:vertical {{
-        background-color: {COLORS['bg_elevated']};
+        background-color: {theme_colors['bg_elevated']};
         min-height: 20px;
         border-radius: 5px;
         margin: 2px;
     }}
     
-    QScrollBar::handle:vertical:hover {{
-        background-color: {COLORS['text_disabled']};
-    }}
-    
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-        height: 0px;
-    }}
-    
-    QScrollBar:horizontal {{
-        background-color: transparent;
-        height: 10px;
-        margin: 0px;
-    }}
-    
-    QScrollBar::handle:horizontal {{
-        background-color: {COLORS['bg_elevated']};
-        min-width: 20px;
-        border-radius: 5px;
-        margin: 2px;
-    }}
-    
-    QScrollBar::handle:horizontal:hover {{
-        background-color: {COLORS['text_disabled']};
-    }}
-    
-    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
-        width: 0px;
-    }}
-    
     /* ===== SPLITTER ===== */
     QSplitter::handle {{
-        background-color: {COLORS['bg_secondary']};
-    }}
-    
-    QSplitter::handle:hover {{
-        background-color: {COLORS['accent_blue']};
+        background-color: {theme_colors['bg_secondary']};
     }}
     
     /* ===== STATUS BAR ===== */
     QStatusBar {{
-        background-color: {COLORS['bg_secondary']};
-        color: {COLORS['text_primary']};
-        border-top: 1px solid {COLORS['border']};
-        font-weight: normal;
-    }}
-    
-    QStatusBar::item {{
-        border: none;
-    }}
-    
-    QStatusBar QLabel {{
-        color: {COLORS['text_primary']};
-        background: transparent;
+        background-color: {theme_colors['bg_secondary']};
+        color: {theme_colors['text_primary']};
+        border-top: 1px solid {theme_colors['border']};
     }}
     
     /* ===== TOOL BAR (Activity Bar) ===== */
     QToolBar {{
-        background-color: {COLORS['bg_secondary']};
-        border-right: 1px solid {COLORS['border']};
-        spacing: 8px;
-    }}
-    
-    QToolButton {{
-        background-color: transparent;
-        border: none;
-        border-left: 3px solid transparent;
-        border-radius: 0;
-        padding: 8px;
-    }}
-    
-    QToolButton:hover {{
-        background-color: {COLORS['bg_elevated']};
+        background-color: {theme_colors['bg_secondary']};
+        border-right: 1px solid {theme_colors['border']};
     }}
     
     QToolButton:checked {{
-        border-left: 3px solid {COLORS['accent_blue']};
-        background-color: {COLORS['bg_elevated']};
+        border-left: 3px solid {theme_colors['accent_blue']};
+        background-color: {theme_colors['bg_elevated']};
     }}
     
     /* ===== COMBO BOX ===== */
     QComboBox {{
-        background-color: {COLORS['bg_elevated']};
-        color: {COLORS['text_primary']};
-        border: 1px solid {COLORS['border']};
+        background-color: {theme_colors['bg_elevated']};
+        color: {theme_colors['text_primary']};
+        border: 1px solid {theme_colors['border']};
         border-radius: 4px;
-        padding: 5px 10px;
-    }}
-    
-    QComboBox:hover {{
-        border-color: {COLORS['accent_blue']};
-    }}
-    
-    QComboBox::drop-down {{
-        border: none;
-        width: 20px;
-    }}
-    
-    QComboBox QAbstractItemView {{
-        background-color: {COLORS['bg_elevated']};
-        color: {COLORS['text_primary']};
-        selection-background-color: {COLORS['accent_blue']};
     }}
     
     /* ===== TOOLTIP ===== */
     QToolTip {{
-        background-color: {COLORS['bg_secondary']};
-        color: {COLORS['text_primary']};
-        border: 1px solid {COLORS['accent_blue']};
-        border-radius: 4px;
-        padding: 4px;
+        background-color: {theme_colors['bg_secondary']};
+        color: {theme_colors['text_primary']};
+        border: 1px solid {theme_colors['accent_blue']};
     }}
     """
 
 def get_light_stylesheet():
-    # Placeholder for light mode, possibly just return dark for now to maintain the vibe
-    return get_stylesheet()
+    return get_stylesheet(theme='light')

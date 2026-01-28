@@ -158,21 +158,21 @@
 
 ---
 
-## **Phase 6: Plugin System & Theming** 🚧 In Progress
+## **Phase 6: Plugin System & Theming** ✅ Completed
 
 **Goal:** Make IDE extendable and customizable.
 
 **Tasks:**
 
-- **Theming** (✅ Partially Completed):
-  - Centralized `theme.py` with color palette.
-  - Global stylesheet application.
-  - *Next*: specific light mode support.
-- **Plugin system** for custom features.
-- Install/enable plugins dynamically.
-- **Themes**: light/dark modes, customizable syntax highlighting.
-- Customizable **keyboard shortcuts** and keymaps.
-- Settings sync across projects.
+- **Theming** (✅ Completed):
+  - ✅ Centralized `theme.py` with color palette.
+  - ✅ Global stylesheet application.
+  - ✅ Full light mode support.
+- ✅ **Plugin system** for custom features.
+- ✅ Install/enable plugins dynamically.
+- ✅ **Themes**: light/dark modes, customizable syntax highlighting.
+- ✅ Customizable **keyboard shortcuts** and keymaps.
+- ✅ Settings sync across projects.
 
 **Learning Outcomes:**
 
@@ -221,7 +221,7 @@
 | 4     | Git & GitHub                | ✅ Completed   |
 | 4.5   | UX & Performance            | ✅ Completed   |
 | 5     | Env & Dependency Management | ✅ Completed   |
-| 6     | Plugin System & Theming     | 🚧 In Progress |
+| 6     | Plugin System & Theming     | ✅ Completed   |
 | 7     | Polishing & Deployment      | ✅ Completed   |
 | 8     | Future Enhancements         | ⏳ Optional    |
 
