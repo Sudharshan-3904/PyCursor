@@ -1,3 +1,9 @@
+"""
+Python Environment and Virtualenv Management Module.
+Handles discovery, creation, and inspection of Python runtimes within the project scope.
+Ensures that the IDE correctly identifies and utilizes project-specific dependencies.
+"""
+
 import os
 import sys
 import venv
@@ -5,18 +11,31 @@ import subprocess
 import platform
 
 class EnvironmentManager:
+    """
+    Manages Python interpreters and virtual environments associated with the active project.
+    Provides utilities to list available runtimes and create new isolated environments.
+    """
     def __init__(self, project_path=None):
+        """
+        Initializes the manager with an optional project root.
+        """
         self.project_path = project_path
         self._active_env = None
 
-    def set_project_path(self, path):
+    def set_project_path(self, path: str):
+        """
+        Updates the target project directory for environment discovery.
+        """
         self.project_path = path
 
-    def list_environments(self):
-        """Detect common virtual environment directories."""
+    def list_environments(self) -> list:
+        """
+        Scans the project directory and system for valid Python runtimes.
+        Returns a list of dictionaries containing name, absolute path, and runtime type.
+        """
         envs = []
         
-        # Always include System Python
+        # 1. System Default Interpreter
         envs.append({
             "name": "Global Python",
             "path": sys.executable,
@@ -26,67 +45,71 @@ class EnvironmentManager:
         if not self.project_path or not os.path.isdir(self.project_path):
             return envs
         
-        # Check for local venvs
-        common_names = [".venv", "venv", "env", ".env", "env3"]
-        
+        # 2. Heuristic Search for Local Virtual Environments
+        venv_names = [".venv", "venv", "env", ".env", "env3"]
         try:
-            with os.scandir(self.project_path) as it:
-                for entry in it:
-                    if entry.is_dir() and entry.name in common_names:
-                        python_path = self._get_python_executable(entry.path)
-                        if python_path and os.path.exists(python_path):
-                            envs.append({
-                                "name": entry.name,
-                                "path": python_path,
-                                "type": "venv"
-                            })
-        except Exception as e:
-            print(f"Error scanning for environments: {e}")
+            for entry in os.scandir(self.project_path):
+                if entry.is_dir() and entry.name in venv_names:
+                    binary_path = self._resolve_python_binary(entry.path)
+                    if binary_path and os.path.exists(binary_path):
+                        envs.append({
+                            "name": entry.name,
+                            "path": binary_path,
+                            "type": "venv"
+                        })
+        except Exception:
+            pass
         
         return envs
 
-    def _get_python_executable(self, env_dir):
+    def _resolve_python_binary(self, env_dir: str) -> str:
+        """
+        Platform-aware resolution of the Python executable within a virtual environment directory.
+        """
         if platform.system() == "Windows":
             return os.path.join(env_dir, "Scripts", "python.exe")
-        else:
-            return os.path.join(env_dir, "bin", "python")
+        return os.path.join(env_dir, "bin", "python")
 
-    def create_venv(self, name=".venv"):
-        if not self.project_path:
-            raise ValueError("Project path not set")
+    def create_venv(self, name: str = ".venv") -> str:
+        """
+        Programmatically creates a new isolated virtual environment using the standard library.
+        """
+        if not self.project_path: raise ValueError("Target project path must be set.")
         
-        env_dir = os.path.join(self.project_path, name)
-        builder = venv.EnvBuilder(with_pip=True)
-        builder.create(env_dir)
-        return self._get_python_executable(env_dir)
+        target_dir = os.path.join(self.project_path, name)
+        # Initialize the environment with pip pre-installed
+        venv.EnvBuilder(with_pip=True).create(target_dir)
+        return self._resolve_python_binary(target_dir)
 
-    def get_active_env(self):
-        if self._active_env and os.path.exists(self._active_env):
-            return self._active_env
-        return sys.executable  # Fallback to system python
+    def get_active_env(self) -> str:
+        """
+        Returns the path to the currently selected Python interpreter.
+        Defaults to the global system Python if no project-specific env is active.
+        """
+        return self._active_env if (self._active_env and os.path.exists(self._active_env)) else sys.executable
 
-    def set_active_env(self, python_path):
+    def set_active_env(self, python_path: str):
+        """
+        Persists the path to the chosen interpreter for the current session.
+        """
         if os.path.exists(python_path):
             self._active_env = python_path
 
-    def get_installed_packages(self, python_path):
-        """Run pip freeze on the given python executable."""
+    def get_installed_packages(self, python_path: str) -> list:
+        """
+        Queries the provided interpreter for its currently installed package manifest via 'pip freeze'.
+        """
         try:
-            # Need to create startupinfo to hide window on Windows
-            startupinfo = None
+            # Hide the subprocess console window on Windows
+            si = None
             if platform.system() == "Windows":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 
-            result = subprocess.run(
+            res = subprocess.run(
                 [python_path, "-m", "pip", "freeze"],
-                capture_output=True,
-                text=True,
-                check=True,
-                startupinfo=startupinfo
+                capture_output=True, text=True, check=True, startupinfo=si
             )
-            return result.stdout.splitlines()
-        except subprocess.CalledProcessError:
-            return []
+            return res.stdout.splitlines()
         except Exception:
             return []

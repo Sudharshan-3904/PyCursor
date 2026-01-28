@@ -1,124 +1,111 @@
+"""
+Local AI Model Management Module.
+Facilitates communication with local LLM backends (Ollama, LM Studio) using 
+RESTful APIs and system-level discovery.
+"""
+
 import requests
 import subprocess
 from core.utilities.utils import load_systemPrompt
 
-
-
 class LocalModelHandler:
-    def __init__(self, backend="lmstudio", model_name=None, lmstudio_url="http://127.0.0.1:1234", ollama_url="http://127.0.0.1:11434"):
+    """
+    Interface for interacting with locally hosted Large Language Models.
+    Abstracts the implementation differences between Ollama and OpenAI-compatible
+    backends like LM Studio.
+    """
+    def __init__(self, backend="ollama", model_name=None, lmstudio_url="http://127.0.0.1:1234", ollama_url="http://127.0.0.1:11434"):
+        """
+        Initializes the handler with target backend configuration.
+        """
         self.backend = backend.lower()
         self.model_name = model_name
         self.lmstudio_url = lmstudio_url
         self.ollama_url = ollama_url
         self.system_prompt = {"role": "system", "content": load_systemPrompt()}
 
-    def chunk_text(self, text, chunk_size=512):
+    def _chunk_text(self, text: str, chunk_size: int = 2048) -> list:
+        """
+        Internal utility to split large prompts into manageable pieces to avoid context overflow.
+        """
         return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
-    def query_lmstudio(self, prompt):
+    def query_lmstudio(self, prompt: str) -> str:
+        """
+        Executes a completion request against an LM Studio (OpenAI-compatible) endpoint.
+        """
         payload = {
-            "messages": [
-                self.system_prompt,
-                {"role": "user", "content": prompt}
-            ],
+            "messages": [self.system_prompt, {"role": "user", "content": prompt}],
             "model": self.model_name or "default"
         }
         try:
-            response = requests.post(f"{self.lmstudio_url}/v1/chat/completions", json=payload)
-            response.raise_for_status()
-            json_resp = response.json()
-            return json_resp["choices"][0]["message"]["content"]
+            resp = requests.post(f"{self.lmstudio_url}/v1/chat/completions", json=payload, timeout=30)
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
         except Exception as e:
-            return f"[Error querying LM Studio: {e}]"
+            return f"[LM Studio Error]: {e}"
 
-    def query_ollama(self, prompt):
+    def query_ollama(self, prompt: str) -> str:
+        """
+        Executes a completion request against the Ollama chat API.
+        """
         payload = {
             "model": self.model_name or "granite3.1-moe:latest",
-            "messages": [
-                self.system_prompt,
-                {"role": "user", "content": prompt}
-            ],
-            "max_tokens": 500,
+            "messages": [self.system_prompt, {"role": "user", "content": prompt}],
             "stream": False
         }
         try:
-            response = requests.post(f"{self.ollama_url}/api/chat", json=payload)
-            response.raise_for_status()
-            data = response.json()
-            
-            message = data.get("message", {})
-            return message.get("content", "")
+            resp = requests.post(f"{self.ollama_url}/api/chat", json=payload, timeout=30)
+            resp.raise_for_status()
+            return resp.json().get("message", {}).get("content", "")
         except Exception as e:
-            return f"[Error querying Ollama: {e}]"
+            return f"[Ollama Error]: {e}"
 
-    def query_api(self, prompt):
-        return f"[API response from {self.model_name or 'default'}]"
-
-    def local_model_response(self, prompt):
-        chunks = self.chunk_text(prompt)
-        responses = []
+    def local_model_response(self, prompt: str) -> str:
+        """
+        Orchestrates request chunking and backend-specific querying.
+        """
+        chunks = self._chunk_text(prompt)
+        results = []
 
         for chunk in chunks:
             if self.backend == "lmstudio":
                 res = self.query_lmstudio(chunk)
             elif self.backend == "ollama":
-                raw = self.query_ollama(chunk)
-                if isinstance(raw, dict) and "content" in raw:
-                    res = raw["content"]
-                elif isinstance(raw, list):
-                    res = " ".join(r.get("content", "") for r in raw)
-                else:
-                    res = str(raw)
+                res = self.query_ollama(chunk)
             else:
-                res = f"[Unknown backend: {self.backend}]"
+                res = f"[Error]: Active backend '{self.backend}' is not supported."
+            results.append(res.strip())
 
-            responses.append(res.strip())
+        return " ".join(results)
 
-        return " ".join(responses)
+    def detect_models(self) -> dict:
+        """
+        Discovers locally running models by polling API endpoints and system binaries.
+        Returns a dictionary of human-readable labels and model identifiers.
+        """
+        discovered = {}
 
-    def detect_models(self):
-        models = {}
-
+        # 1. Inspect LM Studio (OpenAI compatible list endpoint)
         try:
-            response = requests.get(f"{self.lmstudio_url}/v1/models", timeout=2)
-            if response.status_code == 200:
-                data = response.json()
-                for model in data.get("data", []):
-                    model_name = model.get("id", str(model))
-                    models[f"LM Studio: {model_name}"] = model_name
-        except Exception as e:
-            print("LM Studio API detection failed:", e)
+            resp = requests.get(f"{self.lmstudio_url}/v1/models", timeout=2)
+            if resp.status_code == 200:
+                for m in resp.json().get("data", []):
+                    name = m.get("id")
+                    discovered[f"LM Studio: {name}"] = name
+        except Exception:
+            pass
 
+        # 2. Inspect Ollama (system command)
         try:
-            result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
-            lines = result.stdout.splitlines()
+            proc = subprocess.run(["ollama", "list"], capture_output=True, text=True, check=False)
+            lines = proc.stdout.splitlines()
+            if len(lines) > 1: # Skip header
+                for line in lines[1:]:
+                    if line.strip():
+                        name = line.split()[0]
+                        discovered[f"Ollama: {name}"] = name
+        except Exception:
+            pass
 
-            if lines and "NAME" in lines[0]:
-                lines = lines[1:]
-
-            for line in lines:
-                if line.strip():
-                    model_name = line.split()[0]
-                    models[f"Ollama: {model_name}"] = model_name
-        except Exception as e:
-            print("Ollama detection failed:", e)
-
-        return models
-
-def main():
-    print("=== Local Model Interface ===")
-    backend = input("Choose backend (lmstudio / ollama): ").strip().lower()
-    model_name = input("Enter model name (leave empty for default): ").strip() or None
-
-    handler = LocalModelHandler(backend=backend, model_name=model_name)
-    while True:
-        prompt = input("\nEnter prompt (or 'exit' to quit): ")
-        if prompt.lower() in ["exit", "quit"]:
-            break
-        response = handler.local_model_response(prompt)
-        print("\n=== Model Response ===")
-        print(response)
-
-
-if __name__ == "__main__":
-    main()
+        return discovered
