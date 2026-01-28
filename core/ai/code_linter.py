@@ -58,13 +58,14 @@ class CodeLinter:
         
         return tools
     
-    def lint_file(self, file_path: str, tools: Optional[List[str]] = None) -> List[LintError]:
+    def lint_file(self, file_path: str, tools: Optional[List[str]] = None, python_exec: str = None) -> List[LintError]:
         """
         Lint a Python file using specified tools
         
         Args:
             file_path: Path to Python file
             tools: List of tools to use (None = use all available)
+            python_exec: Path to python executable to use
             
         Returns:
             List of lint errors found
@@ -79,15 +80,15 @@ class CodeLinter:
         
         for tool in tools:
             if tool == 'pyflakes':
-                all_errors.extend(self._run_pyflakes(file_path))
+                all_errors.extend(self._run_pyflakes(file_path, python_exec))
             elif tool == 'mypy':
-                all_errors.extend(self._run_mypy(file_path))
+                all_errors.extend(self._run_mypy(file_path, python_exec))
             elif tool == 'ruff':
-                all_errors.extend(self._run_ruff(file_path))
+                all_errors.extend(self._run_ruff(file_path, python_exec))
             elif tool == 'pylint':
-                all_errors.extend(self._run_pylint(file_path))
+                all_errors.extend(self._run_pylint(file_path, python_exec))
             elif tool == 'flake8':
-                all_errors.extend(self._run_flake8(file_path))
+                all_errors.extend(self._run_flake8(file_path, python_exec))
         
         return all_errors
     
@@ -116,11 +117,15 @@ class CodeLinter:
         finally:
             os.unlink(temp_path)
     
-    def _run_pyflakes(self, file_path: str) -> List[LintError]:
+    def _run_pyflakes(self, file_path: str, python_exec: str = None) -> List[LintError]:
         """Run pyflakes and parse output"""
         try:
+            cmd = ['pyflakes', file_path]
+            if python_exec:
+                cmd = [python_exec, '-m', 'pyflakes', file_path]
+
             result = subprocess.run(
-                ['pyflakes', file_path],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -147,11 +152,15 @@ class CodeLinter:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return []
     
-    def _run_mypy(self, file_path: str) -> List[LintError]:
+    def _run_mypy(self, file_path: str, python_exec: str = None) -> List[LintError]:
         """Run mypy and parse output"""
         try:
+            cmd = ['mypy', '--show-column-numbers', '--no-error-summary', file_path]
+            if python_exec:
+                cmd = [python_exec, '-m', 'mypy', '--show-column-numbers', '--no-error-summary', file_path]
+
             result = subprocess.run(
-                ['mypy', '--show-column-numbers', '--no-error-summary', file_path],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=15
@@ -185,11 +194,15 @@ class CodeLinter:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return []
     
-    def _run_ruff(self, file_path: str) -> List[LintError]:
+    def _run_ruff(self, file_path: str, python_exec: str = None) -> List[LintError]:
         """Run ruff and parse output"""
         try:
+            cmd = ['ruff', 'check', '--output-format=text', file_path]
+            if python_exec:
+                cmd = [python_exec, '-m', 'ruff', 'check', '--output-format=text', file_path]
+
             result = subprocess.run(
-                ['ruff', 'check', '--output-format=text', file_path],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -216,11 +229,15 @@ class CodeLinter:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return []
     
-    def _run_pylint(self, file_path: str) -> List[LintError]:
+    def _run_pylint(self, file_path: str, python_exec: str = None) -> List[LintError]:
         """Run pylint and parse output"""
         try:
+            cmd = ['pylint', '--output-format=text', '--score=n', file_path]
+            if python_exec:
+                cmd = [python_exec, '-m', 'pylint', '--output-format=text', '--score=n', file_path]
+            
             result = subprocess.run(
-                ['pylint', '--output-format=text', '--score=n', file_path],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=20
@@ -254,11 +271,15 @@ class CodeLinter:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return []
     
-    def _run_flake8(self, file_path: str) -> List[LintError]:
+    def _run_flake8(self, file_path: str, python_exec: str = None) -> List[LintError]:
         """Run flake8 and parse output"""
         try:
+            cmd = ['flake8', file_path]
+            if python_exec:
+                cmd = [python_exec, '-m', 'flake8', file_path]
+
             result = subprocess.run(
-                ['flake8', file_path],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=10

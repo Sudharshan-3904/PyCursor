@@ -1,0 +1,26 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0 -- E:\Tester\PyCursor\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+PySide6 6.10.0 -- Qt runtime 6.10.0 -- Qt compiled 6.10.0
+rootdir: E:\Tester\PyCursor
+plugins: anyio-4.11.0, langsmith-0.4.41, qt-4.5.0
+collecting ... collected 3 items
+
+tests/test_git.py::test_git_detection PASSED                             [ 33%]
+tests/test_git.py::test_git_history PASSED                               [ 66%]
+E:\Tester\PyCursor\.venv\Lib\site-packages\_pytest\unraisableexception.py:67: PytestUnraisableExceptionWarning: Exception ignored in: <function Popen.__del__ at 0x0000026FB6760720>
+
+Traceback (most recent call last):
+  File "C:\Users\sudha\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1130, in __del__
+    self._internal_poll(_deadstate=_maxsize)
+  File "C:\Users\sudha\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1575, in _internal_poll
+    if _WaitForSingleObject(self._handle, 0) == _WAIT_OBJECT_0:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [WinError 6] The handle is invalid
+
+Enable tracemalloc to get traceback where the object was allocated.
+See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+  warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+tests/test_git.py::test_git_status PASSED                                [100%]
+
+============================== 3 passed in 0.97s ==============================

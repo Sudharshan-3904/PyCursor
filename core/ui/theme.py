@@ -57,6 +57,7 @@ COLORS = {
     'list_selected': '#45475a',
 
     'accent_blue_hover': '#b4befe', # Lavender
+    'text_dim': '#6c7086', # Muted text
 }
 
 def get_stylesheet():

@@ -32,7 +32,11 @@ from core.ui.log_panel import LogPanel
 from core.ide.editor_manager import EditorManager
 from core.ui.menu_manager import MenuManager
 from core.ui.extensions_panel import ExtensionsPanel
+from core.ui.extensions_panel import ExtensionsPanel
 from core.ui.search_panel import SearchPanel
+from core.env.env_manager import EnvironmentManager
+from core.env.dependency_manager import DependencyManager
+from core.ui.env_dialogs import EnvironmentSelectionDialog
 
 
 class StartupThread(QThread):
@@ -140,7 +144,11 @@ class PyCursorMain(QMainWindow):
         self.create_activity_bar()
         
         
+        self.env_manager = EnvironmentManager(self.project_path)
+        self.dep_manager = DependencyManager(self.project_path)
+        
         self.create_status_bar()
+        self.update_env_status()
         
         self.keybindings = KeyBindingsManager()
         self.setup_keybindings()
@@ -153,6 +161,18 @@ class PyCursorMain(QMainWindow):
         self.startup_thread.models_ready.connect(self.on_models_loaded)
         self.startup_thread.git_ready.connect(self.on_git_ready)
         self.startup_thread.start()
+
+        # Show welcome screen if first time
+        QTimer.singleShot(500, self.show_welcome_screen)
+
+    def show_welcome_screen(self):
+        """Show the onboarding dialog for first-time users"""
+        if not self._settings.get("has_shown_welcome", False):
+            from core.ui.welcome_dialog import WelcomeDialog
+            dialog = WelcomeDialog(self)
+            if dialog.exec():
+                self._settings["has_shown_welcome"] = True
+                self._save_settings()
 
     def on_models_loaded(self, models):
         if hasattr(self, 'ai_widget'):
@@ -335,6 +355,24 @@ class PyCursorMain(QMainWindow):
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         status_bar.addWidget(spacer)
         
+        # Environment Selector (Right side, before cursor)
+        self.status_env_button = QPushButton("Python")
+        self.status_env_button.setFlat(True)
+        self.status_env_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.status_env_button.setStyleSheet(f"""
+            QPushButton {{
+                color: {COLORS['text_primary']};
+                padding: 0 10px;
+                border: none;
+                text-align: center;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['bg_tertiary']};
+            }}
+        """)
+        self.status_env_button.clicked.connect(self.open_env_selection)
+        status_bar.addWidget(self.status_env_button)
+
         # Right side
         self.status_cursor_label = QLabel("Ln 1, Col 1")
         self.status_cursor_label.setStyleSheet(f"color: {COLORS['text_primary']}; padding: 0 10px;")
@@ -407,6 +445,10 @@ class PyCursorMain(QMainWindow):
         self.editor_manager.close_all_tabs()
         self.project_path = folder
         self._update_last_open_folder(folder)
+
+        self.env_manager.set_project_path(folder)
+        self.dep_manager.project_path = folder
+        self.update_env_status()
 
         if hasattr(self.sidebar, "setRootPath"):
             self.sidebar.setRootPath(folder)
@@ -497,7 +539,10 @@ class PyCursorMain(QMainWindow):
 
         terminal = self.terminal_tabs.currentWidget()
         if terminal and hasattr(terminal, "execute_command"):
-            terminal.execute_command(f"python \"{file_path}\"")
+            python_exec = self.env_manager.get_active_env()
+            # Quote path if it contains spaces
+            python_cmd = f'"{python_exec}"' if " " in python_exec else python_exec
+            terminal.execute_command(f"{python_cmd} \"{file_path}\"")
 
     def add_terminal_tab(self, name="Terminal"):
         term = Terminal(project_path=self.project_path)
@@ -607,6 +652,43 @@ class PyCursorMain(QMainWindow):
         palette.move(x, y)
         
         palette.exec()
+
+
+    def update_env_status(self):
+        """Update the status bar with the current python environment"""
+        active_env = self.env_manager.get_active_env()
+        name = "Global Python"
+        
+        # Try to find a nice name for it
+        dirs = active_env.split(os.sep)
+        if "Scripts" in dirs or "bin" in dirs:
+             # Likely a venv, get the parent of that
+             # path/to/.venv/Scripts/python.exe -> .venv
+             try:
+                 idx = -1
+                 if "Scripts" in dirs: idx = dirs.index("Scripts")
+                 elif "bin" in dirs: idx = dirs.index("bin")
+                 if idx > 0:
+                     name = dirs[idx-1]
+             except:
+                 pass
+            
+        # Match strictly with listed envs if possible
+        for env in self.env_manager.list_environments():
+            if env['path'] == active_env:
+                name = env['name']
+                break
+        
+        self.status_env_button.setText(f"{name}")
+
+    def open_env_selection(self):
+        dialog = EnvironmentSelectionDialog(self, self.env_manager, self.env_manager.get_active_env())
+        dialog.env_selected.connect(self.on_env_selected)
+        dialog.exec()
+
+    def on_env_selected(self, name, path):
+        self.env_manager.set_active_env(path)
+        self.update_env_status()
 
 
 

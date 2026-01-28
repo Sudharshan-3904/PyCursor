@@ -661,7 +661,13 @@ For code edits, use <<<edit>>> tags as usual."""
                 return
             
             self.chat_area.append("<b>Running code linter...</b>")
-            errors = self.code_linter.lint_file(file_path)
+            
+            # Get active python env
+            python_exec = None
+            if hasattr(self.main_window, 'env_manager'):
+                python_exec = self.main_window.env_manager.get_active_env()
+
+            errors = self.code_linter.lint_file(file_path, python_exec=python_exec)
             
             if not errors:
                 self.chat_area.append("<i>[No errors found! Code looks good.]</i>")

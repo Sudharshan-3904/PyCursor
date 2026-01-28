@@ -65,6 +65,19 @@ class EditorManager:
 
         try:
             if file_path:
+                # Performance optimization: Check file size
+                file_size = os.path.getsize(file_path)
+                if file_size > 1024 * 1024 * 5: # 5MB limit
+                    reply = QMessageBox.warning(
+                        self.main_window,
+                        "Large File Detected",
+                        f"The file '{os.path.basename(file_path)}' is quite large ({file_size / (1024*1024):.1f} MB).\n"
+                        "Opening large files may affect performance. Do you want to continue?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    )
+                    if reply == QMessageBox.StandardButton.No:
+                        return
+
                 with open(file_path, "r", encoding="utf-8") as f:
                     editor.setText(f.read())
                 title = os.path.basename(file_path)

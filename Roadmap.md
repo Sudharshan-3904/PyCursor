@@ -139,16 +139,16 @@
 
 ---
 
-## **Phase 5: Python Environment & Dependency Management** ⏳ Planned
+## **Phase 5: Python Environment & Dependency Management** ✅ Completed
 
 **Goal:** Handle Python projects seamlessly.
 
-**Tasks:**
+**Tasks Completed:**
 
-- Create, activate, and switch virtual environments (`venv`, `conda`).
-- Auto-detect project dependencies (`requirements.txt`, `pyproject.toml`).
-- Integrate environment selection into IDE toolbar or menu.
-- Ensure LLM and editor features respect active environment.
+- [x] Create, activate, and switch virtual environments (`venv`).
+- [x] Auto-detect project dependencies (`requirements.txt`, `pyproject.toml`).
+- [x] Integrate environment selection into IDE toolbar/statusbar.
+- [x] Ensure LLM and editor features respect active environment.
 
 **Learning Outcomes:**
 
@@ -158,25 +158,7 @@
 
 ---
 
-## **Phase 6: Multi-Language Support** ⏳ Planned
-
-**Goal:** Extend IDE beyond Python.
-
-**Tasks:**
-
-- Syntax highlighting for JavaScript/TypeScript, C++, Rust, Go.
-- Language-specific linting and error checking.
-- Run/debug scripts for each language.
-- AI autocomplete and explanation for multiple languages.
-
-**Learning Outcomes:**
-
-- Extending highlighter and code intelligence across languages.
-- Supporting language-specific interpreters/compilers.
-
----
-
-## **Phase 7: Plugin System & Theming** 🚧 In Progress
+## **Phase 6: Plugin System & Theming** 🚧 In Progress
 
 **Goal:** Make IDE extendable and customizable.
 
@@ -200,7 +182,7 @@
 
 ---
 
-## **Phase 8: Polishing & Deployment** ⏳ Planned
+## **Phase 7: Polishing & Deployment** ✅ Completed
 
 **Goal:** Make PyCursor IDE production-ready.
 
@@ -220,7 +202,7 @@
 
 ---
 
-## **Phase 9: Future Enhancements** 🌟 Optional
+## **Phase 8: Future Enhancements** 🌟 Optional
 
 - Cloud sync for settings/projects.
 - Integrated notebook support (Jupyter-like).
@@ -238,10 +220,9 @@
 | 3     | LLM Integration             | ✅ Completed   |
 | 4     | Git & GitHub                | ✅ Completed   |
 | 4.5   | UX & Performance            | ✅ Completed   |
-| 5     | Env & Dependency Management | ⏳ Planned     |
-| 6     | Multi-language Support      | ⏳ Planned     |
-| 7     | Plugin System & Theming     | 🚧 In Progress |
-| 8     | Polishing & Deployment      | ⏳ Planned     |
-| 9     | Future Enhancements         | ⏳ Optional    |
+| 5     | Env & Dependency Management | ✅ Completed   |
+| 6     | Plugin System & Theming     | 🚧 In Progress |
+| 7     | Polishing & Deployment      | ✅ Completed   |
+| 8     | Future Enhancements         | ⏳ Optional    |
 
 ---

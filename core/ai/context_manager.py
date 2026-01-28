@@ -53,17 +53,18 @@ class ContextManager:
         # 2. Smart content search (Basic Keyword Matching)
         # If no explicit files, or just to augment, search for query terms in filenames
         # (A full semantic search would is better but requires embeddings)
-        if not explicit_files:
-            keyword_files = self._find_relevant_files_by_keyword(query)
-            for rel_path in keyword_files:
-                if rel_path not in used_files: # Avoid duplicates
-                    file_path = os.path.join(self.project_path, rel_path)
-                    content = self._read_file(file_path)
-                    if content:
-                        # Simple budget check
-                        if sum(len(c) for c in context_parts) + len(content) < self.max_context_length:
-                            used_files.append(rel_path)
-                            context_parts.append(f"File: {rel_path}\n```\n{content}\n```")
+        # 2. Smart content search (Content & Keyword)
+        # Always run this to find related files not explicitly mentioned
+        keyword_files = self._find_relevant_files_by_keyword(query)
+        for rel_path in keyword_files:
+            if rel_path not in used_files: # Avoid duplicates
+                file_path = os.path.join(self.project_path, rel_path)
+                content = self._read_file(file_path)
+                if content:
+                    # Simple budget check
+                    if sum(len(c) for c in context_parts) + len(content) < self.max_context_length:
+                        used_files.append(rel_path)
+                        context_parts.append(f"File: {rel_path}\n```\n{content}\n```")
 
         if not context_parts:
             return {"text": "", "files": []}
@@ -89,21 +90,51 @@ class ContextManager:
         return mentions
 
     def _find_relevant_files_by_keyword(self, query: str) -> list:
-        """Find files whose names match keywords in the query"""
+        """
+        Find files relevant to the query by checking filenames AND content.
+        Uses a simple scoring system:
+        - Keyword in filename: 10 points
+        - Keyword in content: 1 point per occurrence (capped)
+        """
         keywords = [k.lower() for k in query.split() if len(k) > 3]
         if not keywords:
             return []
             
         all_files = self._list_all_files()
-        relevant = []
+        scores = {}
         
         for rel_path in all_files:
+            score = 0
             filename = os.path.basename(rel_path).lower()
-            # If any keyword is in the filename
-            if any(k in filename for k in keywords):
-                relevant.append(rel_path)
+            
+            # 1. Check filename
+            for k in keywords:
+                if k in filename:
+                    score += 10
+            
+            # 2. Check content (if file is text and not too huge)
+            # We skip content check if filename matched strongly to save time, 
+            # or we can do it to refine ranking.
+            try:
+                full_path = os.path.join(self.project_path, rel_path)
+                # Skip large files > 100KB to maintain speed
+                if os.path.getsize(full_path) < 100 * 1024:
+                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read().lower()
+                        for k in keywords:
+                            count = content.count(k)
+                            score += min(count, 5) # Cap at 5 points per keyword
+            except Exception:
+                continue
+
+            if score > 0:
+                scores[rel_path] = score
                 
-        return relevant[:3] # Limit auto-retrieval to 3 files to save tokens
+        # Sort by score descending
+        sorted_files = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        
+        # Return top 3
+        return [f[0] for f in sorted_files[:3]]
 
     def _list_all_files(self) -> list:
         """Walk project and return list of relative paths"""
