@@ -1,0 +1,7 @@
+{
+    "name": "Hello World",
+    "id": "pycursor.hello_world",
+    "version": "1.0.0",
+    "description": "A sample plugin that adds a greeting.",
+    "publisher": "PyCursor"
+}

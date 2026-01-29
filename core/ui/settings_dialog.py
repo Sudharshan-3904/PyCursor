@@ -100,10 +100,19 @@ class SettingsDialog(QDialog):
         tabs.addTab(keybindings_tab, "Keybindings")
         
         general_tab = QWidget()
-        gen_layout = QVBoxLayout()
-        gen_layout.addWidget(QLabel("General settings coming soon..."))
-        gen_layout.addStretch()
+        gen_layout = QFormLayout()
         general_tab.setLayout(gen_layout)
+        
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItems(["dark", "light"])
+        self.theme_combo.setCurrentText(self.parent()._settings.get("theme", "dark"))
+        gen_layout.addRow("Theme:", self.theme_combo)
+        
+        self.autosave_cb = QCheckBox("Enable Autosave")
+        self.autosave_cb.setChecked(self.parent()._settings.get("autosave", True))
+        gen_layout.addRow(self.autosave_cb)
+        
+        gen_layout.addRow(QLabel("\nMore settings coming soon..."))
         tabs.addTab(general_tab, "General")
         
         btn_layout = QHBoxLayout()
@@ -144,10 +153,18 @@ class SettingsDialog(QDialog):
         )
         
         if success:
-            QMessageBox.information(self, "Success", f"Configured {provider} successfully!")
+            # Save General settings
+            self.parent()._settings["theme"] = self.theme_combo.currentText()
+            self.parent()._settings["autosave"] = self.autosave_cb.isChecked()
+            self.parent()._save_settings()
+            
+            # Apply theme immediately
+            self.parent().apply_theme(self.theme_combo.currentText())
+            
+            QMessageBox.information(self, "Success", "Settings saved successfully!")
             self.accept()
         else:
-            QMessageBox.warning(self, "Error", "Failed to configure API. Check logs.")
+            QMessageBox.warning(self, "Error", "Failed to configure AI API. Check logs.")
     
     def open_keybindings_dialog(self):
         """Open the keybindings editor dialog"""

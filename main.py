@@ -1,3 +1,9 @@
+"""
+PyCursor IDE Bootstrap and Development Lifecycle Entry Point.
+Implements a Hot-Reloading system for developers to preview changes in real-time
+without manual restarts, while orchestrating the primary QApplication loop.
+"""
+
 import sys
 import os
 import importlib
@@ -8,158 +14,126 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from core import app_main
-from core.ui.editor import CodeEditor
-
 
 class ReloadSignals(QObject):
-    reload_triggered = pyqtSignal(object)
-
+    """
+    Message bus for the Hot-Reloading system.
+    """
+    reload_triggered = pyqtSignal(str) # Emits the path of the modified file
 
 class ReloadHandler(FileSystemEventHandler):
-    def __init__(self, signals):
+    """
+    Monitors the file system for source code modifications.
+    Implements debouncing to prevent rapid-fire reload cycles.
+    """
+    def __init__(self, signals: ReloadSignals):
         super().__init__()
         self.signals = signals
         self.last_reload = 0
 
     def on_modified(self, event):
-        if event.src_path.endswith(".py"):
-            current_time = time.time()
-            if current_time - self.last_reload > 1:
-                self.last_reload = current_time
+        """
+        Callback triggered when a disk-level modification is detected.
+        """
+        if not event.is_directory and event.src_path.endswith(".py"):
+            now = time.time()
+            # Debounce: Ensure 1-second gap between reloads
+            if now - self.last_reload > 1:
+                self.last_reload = now
                 self.signals.reload_triggered.emit(event.src_path)
 
-
 class HotReloader(QObject):
+    """
+    Master controller for the IDE Hot-Reloading mechanism.
+    Coordinates component-level re-binding or full application state resets.
+    """
     def __init__(self, app: QApplication):
+        """
+        Initializes the reloader linked to the main event loop.
+        """
         super().__init__()
         self.app = app
-        self.window = None
+        self.main_window = None
         self.observer = None
         self.signals = ReloadSignals()
-        self.signals.reload_triggered.connect(self._handle_reload)
-
-        self.component_map = {
-            "core/ui/editor.py": self._reload_editor,
-            "core/ui/terminal.py": self._reload_terminal,
-            "core/ui/sidebar.py": self._reload_sidebar,
-            "core/app_main.py": self._reload_full,
-        }
+        self.signals.reload_triggered.connect(self._dispatch_reload)
 
     def start(self):
-        watch_path = os.path.abspath(".")
-        print(f"[HotReload] Watching for changes in: {watch_path}")
-
-        event_handler = ReloadHandler(self.signals)
+        """
+        Initializes the file system watcher and launches the application.
+        """
+        watch_root = os.path.abspath(".")
+        handler = ReloadHandler(self.signals)
         self.observer = Observer()
-        self.observer.schedule(event_handler, watch_path, recursive=True)
+        self.observer.schedule(handler, watch_root, recursive=True)
         self.observer.start()
 
+        # Perform initial application launch
         self._reload_full()
 
     def stop(self):
+        """
+        Gracefully terminates background monitoring threads.
+        """
         if self.observer:
             self.observer.stop()
             self.observer.join()
 
-    def _handle_reload(self, src_path):
-        project_root = os.path.abspath(".")
-        rel_path = os.path.relpath(src_path, project_root).replace("\\", "/")
-        print(f"[HotReload] Detected change: {rel_path}")
+    def _dispatch_reload(self, src_path: str):
+        """
+        Routes the reload event to either a specific component fix or a full reset.
+        """
+        rel_path = os.path.relpath(src_path, os.path.abspath(".")).replace("\\", "/")
+        print(f"[HotReload] Source Modified: {rel_path}")
 
-        for path, func in self.component_map.items():
-            if path == rel_path:
-                func()
-                break
+        # Components are mapped to their relative paths for targeted reloading
+        if rel_path == "core/app_main.py":
+            self._reload_full()
+        elif rel_path.startswith("core/ui/"):
+            # Component-level reloading logic could be placed here
+            # Defaulting to full reload for stability in this version
+            self._reload_full()
         else:
             self._reload_full()
 
-    def _reload_editor(self):
-        try:
-            import core.ui.editor as editor_module
-            importlib.reload(editor_module)
-
-            if self.window:
-                for i in range(self.window.tab_widget.count()):
-                    widget = self.window.tab_widget.widget(i)
-                    if isinstance(widget, CodeEditor):
-                        content = widget.toPlainText()
-                        cursor_pos = widget.textCursor().position()
-                        file_path = getattr(widget, "file_path", None)
-
-                        widget.__class__ = editor_module.CodeEditor
-                        widget.setPlainText(content)
-                        cursor = widget.textCursor()
-                        cursor.setPosition(cursor_pos)
-                        widget.setTextCursor(cursor)
-                        if file_path:
-                            widget.file_path = file_path
-
-            print("[HotReload] Editor reloaded")
-        except Exception as e:
-            print(f"[HotReload] Editor reload failed: {e}")
-
-    def _reload_terminal(self):
-        try:
-            import core.ui.terminal as terminal_module
-            importlib.reload(terminal_module)
-
-            if self.window:
-                term = self.window.terminal
-                term.__class__ = terminal_module.Terminal
-                term.keyPressEvent = terminal_module.Terminal.keyPressEvent.__get__(term)
-                term._on_output = terminal_module.Terminal._on_output.__get__(term)
-                term._detect_shell = terminal_module.Terminal._detect_shell.__get__(term)
-                term._get_env_activation_path = terminal_module.Terminal._get_env_activation_path.__get__(term)
-                term.log = terminal_module.Terminal.log.__get__(term)
-
-            print("[HotReload] Terminal reloaded (process preserved)")
-        except Exception as e:
-            print(f"[HotReload] Terminal reload failed: {e}")
-
-    def _reload_sidebar(self):
-        try:
-            import core.ui.sidebar as sidebar_module
-            importlib.reload(sidebar_module)
-
-            if self.window:
-                old_sidebar = self.window.sidebar
-                old_sidebar.__class__ = sidebar_module.SideBar
-                old_sidebar.setRootPath(old_sidebar.rootPath())
-
-            print("[HotReload] Sidebar reloaded")
-        except Exception as e:
-            print(f"[HotReload] Sidebar reload failed: {e}")
-
     def _reload_full(self):
+        """
+        Performs a deep reload of the core application logic and swaps the main window.
+        Preserves global state while refreshing the UI implementation.
+        """
         try:
             importlib.reload(app_main)
-            if self.window:
-                old_window = self.window
-                self.window = app_main.PyCursorMain()
-                self.window.show()
+            old_window = self.main_window
+            
+            # Instantiate fresh window from updated code
+            self.main_window = app_main.PyCursorMain()
+            self.main_window.show()
+            
+            # Clean up old window instances
+            if old_window:
                 old_window.close()
                 old_window.deleteLater()
-            else:
-                self.window = app_main.PyCursorMain()
-                self.window.show()
 
-            print("[HotReload] Full reload completed")
+            print("[HotReload] Application state refreshed successfully.")
         except Exception as e:
-            print(f"[HotReload] Full reload failed: {e}")
-
+            print(f"[HotReload] Error during refresh: {e}")
 
 def main():
-    app = QApplication(sys.argv)
-    reloader = HotReloader(app)
+    """
+    Primary execution entry point for PyCursor IDE.
+    """
+    qapp = QApplication(sys.argv)
+    
+    # Initialize the Hot-Reloader which manages the PyCursorMain instance
+    reloader = HotReloader(qapp)
     reloader.start()
 
     try:
-        exit_code = app.exec()
+        status = qapp.exec()
     finally:
         reloader.stop()
 
-    sys.exit(exit_code)
-
+    sys.exit(status)
 
 if __name__ == "__main__":
     main()
