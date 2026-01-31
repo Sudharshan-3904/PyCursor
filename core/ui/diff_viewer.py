@@ -48,12 +48,16 @@ class DiffViewer(QDialog):
         self.diff_display.setReadOnly(True)
         
         # Create font with validation
-        font = QFont("Consolas", 10)
+        font = QFont("Courier New", 10)
+        # Ensure the size is set correctly even if font is not exact match
+        font.setPointSize(10)
         if not font.exactMatch():
-            # Fallback to monospace font if Consolas is not available
+            # Fallback to monospace font if Courier New is not available
             font = QFont("Monospace", 10)
+            font.setPointSize(10)
             if not font.exactMatch():
-                font = QFont("Courier New", 10)
+                font = QFont("Consolas", 10)
+                font.setPointSize(10)
         
         # Ensure font size is valid and positive
         if font.pointSize() <= 0:

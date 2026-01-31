@@ -75,12 +75,16 @@ class CodeEditor(QsciScintilla):
         Sets up the editor font with proper fallbacks and validation.
         """
         # Create font with validation
-        font = QFont("Consolas", 11)
+        font = QFont()
+        font.setFamily("Courier New")
+        font.setPointSize(11)
         if not font.exactMatch():
-            # Fallback to monospace font if Consolas is not available
-            font = QFont("Monospace", 11)
+            # Fallback to monospace font if Courier New is not available
+            font.setFamily("Monospace")
+            font.setPointSize(11)
             if not font.exactMatch():
-                font = QFont("Courier New", 11)
+                font.setFamily("Consolas")
+                font.setPointSize(11)
         
         # Ensure font size is valid and positive
         if font.pointSize() <= 0:
@@ -300,13 +304,15 @@ class CodeEditor(QsciScintilla):
             lexer_font.setPointSize(11)
         lexer.setDefaultFont(lexer_font)
         
-        # Set the font for all lexer styles to prevent invalid font sizes
-        for style in range(16):  # QsciLexerPython has 16 styles
-            current_font = lexer.font(style)
-            if current_font.pointSize() <= 0:
-                lexer.setFont(lexer_font, style)
+        # Set the font for all lexer styles to ensure valid font sizes
+        for style in range(16):
+            lexer.setFont(lexer_font, style)
         
         self.setLexer(lexer)
+        
+        # Ensure the widget font is set after lexer to override any defaults
+        self.setFont(font)
+        self.setMarginsFont(font)
 
     def apply_theme_colors(self, theme='dark'):
         """
