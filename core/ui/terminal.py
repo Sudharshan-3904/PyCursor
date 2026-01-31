@@ -2,7 +2,7 @@ import os
 import platform
 from PyQt6.QtCore import QProcess, QProcessEnvironment, Qt
 from PyQt6.QtWidgets import QTextEdit, QSizePolicy
-from PyQt6.QtGui import QTextCursor
+from PyQt6.QtGui import QTextCursor, QFont, QFontDatabase, QFontInfo
 from core.ui.theme import COLORS
 
 class Terminal(QTextEdit):
@@ -21,6 +21,17 @@ class Terminal(QTextEdit):
         self.setMinimumHeight(100)
         self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.setUndoRedoEnabled(False)
+        
+        # Set font to prevent invalid font sizes
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
+        font.setPointSize(10)
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            font = QFont("Courier New", 10)
+            font.setPixelSize(-1)
+            font.setPointSize(10)
+        self.setFont(font)
 
         self.project_path = project_path or os.getcwd()
         self.shell = self._detect_shell()

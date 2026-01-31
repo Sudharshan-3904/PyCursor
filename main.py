@@ -12,6 +12,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtGui import QFont, QFontDatabase, QFontInfo
 
 from core import app_main
 
@@ -123,6 +124,13 @@ def main():
     Primary execution entry point for PyCursor IDE.
     """
     qapp = QApplication(sys.argv)
+    
+    # Set application-wide font to prevent invalid font sizes
+    app_font = QFont()
+    app_font.setFamily("Times New Roman")
+    app_font.setPixelSize(-1)
+    app_font.setPointSize(11)
+    qapp.setFont(app_font)
     
     # Initialize the Hot-Reloader which manages the PyCursorMain instance
     reloader = HotReloader(qapp)

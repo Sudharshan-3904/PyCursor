@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QMenu
-from PyQt6.QtGui import QColor, QFont, QAction
+from PyQt6.QtGui import QColor, QFont, QAction, QFontDatabase, QFontInfo
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython
 from core.ui.theme import COLORS, LIGHT_COLORS
@@ -48,6 +48,7 @@ class CodeEditor(QsciScintilla):
         """
         font = self.font()
         if font.pointSize() <= 0:
+            font.setPixelSize(-1)
             font.setPointSize(11)
             self.setFont(font)
         
@@ -64,6 +65,7 @@ class CodeEditor(QsciScintilla):
         # Ensure font remains valid after resize
         font = self.font()
         if font.pointSize() <= 0:
+            font.setPixelSize(-1)
             font.setPointSize(11)
             self.setFont(font)
             if self.lexer():
@@ -74,17 +76,18 @@ class CodeEditor(QsciScintilla):
         """
         Sets up the editor font with proper fallbacks and validation.
         """
-        # Create font with validation
-        font = QFont()
-        font.setFamily("Courier New")
+        # Use system fixed font to ensure a valid monospace font
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
         font.setPointSize(11)
-        if not font.exactMatch():
-            # Fallback to monospace font if Courier New is not available
-            font.setFamily("Monospace")
+        
+        # Verify the font is actually resolved correctly
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            # Fallback to a known font
+            font = QFont("Courier New", 11)
+            font.setPixelSize(-1)
             font.setPointSize(11)
-            if not font.exactMatch():
-                font.setFamily("Consolas")
-                font.setPointSize(11)
         
         # Ensure font size is valid and positive
         if font.pointSize() <= 0:
@@ -96,6 +99,12 @@ class CodeEditor(QsciScintilla):
         
         # Set the font on the widget
         self.setFont(font)
+        
+        # Ensure font is properly set after all initialization
+        if self.font().pointSize() <= 0:
+            font.setPixelSize(-1)
+            font.setPointSize(11)
+            self.setFont(font)
 
     def _on_text_changed(self):
         """
@@ -292,16 +301,20 @@ class CodeEditor(QsciScintilla):
         
         # Ensure the font is still valid
         if font.pointSize() <= 0:
+            font.setPixelSize(-1)
             font.setPointSize(11)
             self.setFont(font)
         
         self.setMarginsFont(font)
         
+        # Set the widget font before setting the lexer to prevent defaults
+        self.setFont(font)
+        
         lexer = QsciLexerPython()
         # Ensure lexer font is valid before setting
         lexer_font = font
-        if lexer_font.pointSize() <= 0:
-            lexer_font.setPointSize(11)
+        lexer_font.setPixelSize(-1)
+        lexer_font.setPointSize(11)
         lexer.setDefaultFont(lexer_font)
         
         # Set the font for all lexer styles to ensure valid font sizes

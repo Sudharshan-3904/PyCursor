@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QTextEdit, QLabel, QPushButton, QHBoxLayout
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextCharFormat, QColor, QFont
+from PyQt6.QtGui import QTextCharFormat, QColor, QFont, QFontDatabase, QFontInfo
 from core.ui.theme import COLORS
 
 
@@ -47,27 +47,33 @@ class DiffViewer(QDialog):
         self.diff_display = QTextEdit()
         self.diff_display.setReadOnly(True)
         
-        # Create font with validation
-        font = QFont("Courier New", 10)
-        # Ensure the size is set correctly even if font is not exact match
-        font.setPointSize(10)
-        if not font.exactMatch():
-            # Fallback to monospace font if Courier New is not available
-            font = QFont("Monospace", 10)
-            font.setPointSize(10)
-            if not font.exactMatch():
-                font = QFont("Consolas", 10)
-                font.setPointSize(10)
+        # Use system fixed font to ensure a valid monospace font
+        self.display_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        self.display_font.setPixelSize(-1)
+        self.display_font.setPointSize(10)
+        
+        # Verify the font is actually resolved correctly
+        font_info = QFontInfo(self.display_font)
+        if font_info.pointSize() <= 0:
+            # Fallback to a known font
+            self.display_font = QFont("Courier New", 10)
+            self.display_font.setPixelSize(-1)
+            self.display_font.setPointSize(10)
         
         # Ensure font size is valid and positive
-        if font.pointSize() <= 0:
-            font.setPointSize(10)
+        if self.display_font.pointSize() <= 0:
+            self.display_font.setPointSize(10)
         
         # Additional validation
-        if font.pointSizeF() <= 0.0:
-            font.setPointSizeF(10.0)
+        if self.display_font.pointSizeF() <= 0.0:
+            self.display_font.setPointSizeF(10.0)
         
-        self.diff_display.setFont(font)
+        self.diff_display.setFont(self.display_font)
+        
+        # Verify the font was set correctly
+        if self.diff_display.font().pointSize() <= 0:
+            self.display_font.setPointSize(10)
+            self.diff_display.setFont(self.display_font)
         self.diff_display.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {COLORS['editor_bg']};
@@ -129,6 +135,9 @@ class DiffViewer(QDialog):
         
         html = '<pre style="margin: 0; padding: 8px;">' + '<br>'.join(html_lines) + '</pre>'
         self.diff_display.setHtml(html)
+        
+        # Ensure font is set after setting HTML
+        self.diff_display.setFont(self.display_font)
     
     def escape_html(self, text: str) -> str:
         """Escape HTML special characters"""

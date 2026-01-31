@@ -342,9 +342,11 @@ class PyCursorMain(QMainWindow):
         Initializes the application status bar with project and cursor information.
         """
         status_bar = QStatusBar()
+        status_bar.setFixedHeight(22)
         self.setStatusBar(status_bar)
         
         self.status_git_label = QLabel("")
+        self.status_git_label.setObjectName("StatusFirst")
         status_bar.addWidget(self.status_git_label)
         
         self.status_file_label = QLabel("No file open")
@@ -352,21 +354,25 @@ class PyCursorMain(QMainWindow):
         
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        status_bar.addWidget(spacer)
+        status_bar.addWidget(spacer, 1)
         
         # Python Environment Selector
         self.status_env_button = QPushButton("Python")
+        self.status_env_button.setObjectName("StatusRight")
         self.status_env_button.setFlat(True)
         self.status_env_button.clicked.connect(self.open_env_selection)
         status_bar.addWidget(self.status_env_button)
 
         self.status_cursor_label = QLabel("Ln 1, Col 1")
+        self.status_cursor_label.setObjectName("StatusRight")
         status_bar.addWidget(self.status_cursor_label)
         
         self.status_encoding_label = QLabel("UTF-8")
+        self.status_encoding_label.setObjectName("StatusRight")
         status_bar.addWidget(self.status_encoding_label)
         
         self.status_language_label = QLabel("Plain Text")
+        self.status_language_label.setObjectName("StatusRight")
         status_bar.addWidget(self.status_language_label)
 
     def create_menu_bar(self):

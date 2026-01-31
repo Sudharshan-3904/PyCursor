@@ -7,6 +7,7 @@ keeping them separate from the primary AI chat interface.
 """
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QFontDatabase, QFontInfo
 from core.ui.theme import COLORS
 
 class LogPanel(QWidget):
@@ -24,13 +25,23 @@ class LogPanel(QWidget):
 
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)
+        
+        # Set font to prevent invalid font sizes
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
+        font.setPointSize(11)
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            font = QFont("Courier New", 11)
+            font.setPixelSize(-1)
+            font.setPointSize(11)
+        self.log_area.setFont(font)
+        
         self.log_area.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {COLORS['bg_primary']};
                 color: {COLORS['text_secondary']};
                 border: none;
-                font-family: Consolas, monospace;
-                font-size: 11px;
             }}
         """)
         layout.addWidget(self.log_area)

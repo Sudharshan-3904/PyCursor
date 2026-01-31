@@ -5,7 +5,7 @@ from difflib import SequenceMatcher, unified_diff
 from typing import List, Tuple
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QTextCursor
+from PyQt6.QtGui import QTextCursor, QFont, QFontDatabase, QFontInfo
 from PyQt6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel,
     QMessageBox, QPushButton, QSplitter, QTextEdit, QVBoxLayout, QWidget,
@@ -218,6 +218,18 @@ class HunkWidget(QWidget):
         self.new_view = QTextEdit()
         self.new_view.setReadOnly(True)
         self.new_view.setPlainText(hunk.new_text)
+        
+        # Set font to prevent invalid font sizes
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
+        font.setPointSize(10)
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            font = QFont("Courier New", 10)
+            font.setPixelSize(-1)
+            font.setPointSize(10)
+        self.old_view.setFont(font)
+        self.new_view.setFont(font)
         s = QSplitter(Qt.Orientation.Horizontal)
         s.addWidget(self.old_view)
         s.addWidget(self.new_view)
@@ -238,6 +250,15 @@ class AISuggestionDialog(QDialog):
         self._original = original
         self._modified = modified
         layout = QVBoxLayout(self)
+        # Define font
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
+        font.setPointSize(10)
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            font = QFont("Courier New", 10)
+            font.setPixelSize(-1)
+            font.setPointSize(10)
         if explanation:
             label = QLabel(f"<b>Explanation:</b><br>{explanation}")
             label.setWordWrap(True)
@@ -249,6 +270,10 @@ class AISuggestionDialog(QDialog):
         diff_view.setReadOnly(True)
         diff_view.setPlainText(diff_text)
         diff_view.setFixedHeight(180)
+        
+        # Set font
+        diff_view.setFont(font)
+        
         layout.addWidget(diff_view)
         self.hunk_widgets: List[HunkWidget] = []
         hunks = compute_hunks(original, modified)
@@ -295,9 +320,22 @@ class QAResponseDialog(QDialog):
         self.resize(700, 400)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"<b>Question:</b><br>{question}"))
+        # Define font
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
+        font.setPointSize(10)
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            font = QFont("Courier New", 10)
+            font.setPixelSize(-1)
+            font.setPointSize(10)
         ans_view = QTextEdit()
         ans_view.setReadOnly(True)
         ans_view.setPlainText(answer)
+        
+        # Set font
+        ans_view.setFont(font)
+        
         layout.addWidget(ans_view)
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
