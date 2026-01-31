@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QMessageBox, QInputDialog, QMenu, QStackedWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtGui import QIcon, QAction, QFont, QFontDatabase, QFontInfo
 from core.ui.theme import COLORS
 from core.git.git_handler import GitHandler, GitFileStatus
 from core.utilities.worker import WorkerThread

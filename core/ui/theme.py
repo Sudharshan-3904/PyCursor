@@ -115,7 +115,12 @@ def get_stylesheet(theme='dark'):
         background-color: {theme_colors['bg_primary']};
         color: {theme_colors['text_primary']};
         font-family: 'Segoe UI', system-ui, sans-serif;
-        font-size: 13px;
+        font-size: 10pt;
+    }}
+    
+    /* Exclude QsciScintilla and QTextEdit from global font settings to prevent conflicts */
+    QsciScintilla, QTextEdit {{
+        font-family: inherit;
     }}
     
     QMenuBar {{
@@ -162,7 +167,7 @@ def get_stylesheet(theme='dark'):
         padding: 8px;
         font-weight: bold;
         text-transform: uppercase;
-        font-size: 10px;
+        font-size: 8pt;
     }}
     
     QPushButton {{
@@ -207,6 +212,34 @@ def get_stylesheet(theme='dark'):
     QStatusBar {{
         background-color: {theme_colors['bg_secondary']};
         border-top: 1px solid {theme_colors['border']};
+        min-height: 22px;
+    }}
+    
+    QStatusBar::item {{
+        border: none;
+    }}
+    
+    QStatusBar QLabel, QStatusBar QPushButton {{
+        background-color: transparent;
+        color: {theme_colors['text_secondary']};
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-size: 11px;
+        padding: 0px 12px;
+        border-left: 1px solid {theme_colors['border_light']};
+    }}
+    
+    QStatusBar QLabel#StatusFirst {{
+        border-left: none;
+    }}
+    
+    QStatusBar QPushButton {{
+        border: none;
+        border-radius: 0;
+        text-align: center;
+    }}
+    
+    QStatusBar QPushButton:hover {{
+        background-color: {theme_colors['bg_elevated']};
     }}
     
     QToolBar {{

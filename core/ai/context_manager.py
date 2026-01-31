@@ -9,6 +9,7 @@ import os
 import fnmatch
 import re
 import difflib
+from typing import Optional
 
 class ContextManager:
     """

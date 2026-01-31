@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QMenu
-from PyQt6.QtGui import QColor, QFont, QAction
+from PyQt6.QtGui import QColor, QFont, QAction, QFontDatabase, QFontInfo
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython
 from core.ui.theme import COLORS, LIGHT_COLORS
@@ -19,6 +19,8 @@ class CodeEditor(QsciScintilla):
         """
         super().__init__(parent)
 
+        self._setup_font()
+        
         self.setup_lexer()
         self.apply_theme_colors()
 
@@ -27,13 +29,82 @@ class CodeEditor(QsciScintilla):
         self.setTabWidth(4)
         self.setAutoIndent(True)
 
-        # Set line number margin width
-        self.setMarginWidth(0, "0000")
+        # Set line number margin width (calculate width for 4 digits)
+        font_metrics = self.fontMetrics()
+        margin_width = font_metrics.horizontalAdvance("0000") + 10  # Add some padding
+        self.setMarginWidth(0, margin_width)
 
         self.setBraceMatching(QsciScintilla.BraceMatch.SloppyBraceMatch)
 
         self._modified = False
         self.textChanged.connect(self._on_text_changed)
+
+        # Ensure font is properly set after all initialization
+        self._ensure_font_valid()
+
+    def _ensure_font_valid(self):
+        """
+        Final validation to ensure the editor font is properly set and valid.
+        """
+        font = self.font()
+        if font.pointSize() <= 0:
+            font.setPixelSize(-1)
+            font.setPointSize(11)
+            self.setFont(font)
+        
+        if self.lexer():
+            lexer_font = self.lexer().font(0)  # Get the default font from lexer
+            if lexer_font.pointSize() <= 0:
+                self.lexer().setDefaultFont(font)
+
+    def resizeEvent(self, event):
+        """
+        Handle resize events to ensure fonts remain valid.
+        """
+        super().resizeEvent(event)
+        # Ensure font remains valid after resize
+        font = self.font()
+        if font.pointSize() <= 0:
+            font.setPixelSize(-1)
+            font.setPointSize(11)
+            self.setFont(font)
+            if self.lexer():
+                self.lexer().setDefaultFont(font)
+            self.setMarginsFont(font)
+
+    def _setup_font(self):
+        """
+        Sets up the editor font with proper fallbacks and validation.
+        """
+        # Use system fixed font to ensure a valid monospace font
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
+        font.setPointSize(11)
+        
+        # Verify the font is actually resolved correctly
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            # Fallback to a known font
+            font = QFont("Courier New", 11)
+            font.setPixelSize(-1)
+            font.setPointSize(11)
+        
+        # Ensure font size is valid and positive
+        if font.pointSize() <= 0:
+            font.setPointSize(11)
+        
+        # Additional validation - ensure the font is actually usable
+        if font.pointSizeF() <= 0.0:
+            font.setPointSizeF(11.0)
+        
+        # Set the font on the widget
+        self.setFont(font)
+        
+        # Ensure font is properly set after all initialization
+        if self.font().pointSize() <= 0:
+            font.setPixelSize(-1)
+            font.setPointSize(11)
+            self.setFont(font)
 
     def _on_text_changed(self):
         """
@@ -225,13 +296,36 @@ class CodeEditor(QsciScintilla):
         """
         Configures the Python lexer with default fonts and base colors.
         """
-        font = QFont("Consolas", 11)
-        self.setFont(font)
+        # Get the font that was already set
+        font = self.font()
+        
+        # Ensure the font is still valid
+        if font.pointSize() <= 0:
+            font.setPixelSize(-1)
+            font.setPointSize(11)
+            self.setFont(font)
+        
         self.setMarginsFont(font)
         
+        # Set the widget font before setting the lexer to prevent defaults
+        self.setFont(font)
+        
         lexer = QsciLexerPython()
-        lexer.setDefaultFont(font)
+        # Ensure lexer font is valid before setting
+        lexer_font = font
+        lexer_font.setPixelSize(-1)
+        lexer_font.setPointSize(11)
+        lexer.setDefaultFont(lexer_font)
+        
+        # Set the font for all lexer styles to ensure valid font sizes
+        for style in range(16):
+            lexer.setFont(lexer_font, style)
+        
         self.setLexer(lexer)
+        
+        # Ensure the widget font is set after lexer to override any defaults
+        self.setFont(font)
+        self.setMarginsFont(font)
 
     def apply_theme_colors(self, theme='dark'):
         """

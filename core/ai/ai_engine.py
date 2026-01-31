@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QMenu,
     QTextEdit, QPushButton, QLineEdit, QInputDialog, QMessageBox
 )
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QFont, QFontDatabase, QFontInfo
 from PyQt6.QtCore import Qt
 
 from ..utilities.utils import load_icon
@@ -64,6 +64,18 @@ class AIEngine(QWidget):
         self.chat_area = QTextEdit()
         self.chat_area.setReadOnly(True)
         self.chat_area.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        
+        # Set font to prevent invalid font sizes
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPixelSize(-1)
+        font.setPointSize(10)
+        font_info = QFontInfo(font)
+        if font_info.pointSize() <= 0:
+            font = QFont("Courier New", 10)
+            font.setPixelSize(-1)
+            font.setPointSize(10)
+        self.chat_area.setFont(font)
+        
         layout.addWidget(self.chat_area)
 
         # Prompt input field
