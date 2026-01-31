@@ -244,7 +244,7 @@ class PyCursorMain(QMainWindow):
         activity_bar.setOrientation(Qt.Orientation.Vertical)
         activity_bar.setIconSize(QSize(28, 28))
         
-        self.addToolBar(Qt.ToolArea.LeftToolBarArea, activity_bar)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, activity_bar)
         
         # Explorer Toggle
         self.explorer_action = QAction(load_icon("folder.svg"), "Explorer", self)
@@ -510,11 +510,11 @@ class PyCursorMain(QMainWindow):
         """
         Registers all global system shortcuts.
         """
-        self.keybindings.register_shortcut("file.open", self.open_file_dialog, self)
-        self.keybindings.register_shortcut("file.open_folder", self.open_folder_dialog, self)
-        self.keybindings.register_shortcut("file.save", lambda: self.editor_manager.save_current_file(), self)
-        self.keybindings.register_shortcut("app.quick_open", self.show_quick_open, self)
-        self.keybindings.register_shortcut("app.command_palette", self.show_command_palette, self)
+        self.keybindings.register("file.open", self.open_file_dialog, self)
+        self.keybindings.register("file.open_folder", self.open_folder_dialog, self)
+        self.keybindings.register("file.save", lambda: self.editor_manager.save_current_file(), self)
+        self.keybindings.register("app.quick_open", self.show_quick_open, self)
+        self.keybindings.register("app.command_palette", self.show_command_palette, self)
 
     def show_quick_open(self):
         """
@@ -559,6 +559,20 @@ class PyCursorMain(QMainWindow):
         """
         self.env_manager.set_active_env(path)
         self.update_env_status()
+
+    def exit_application(self):
+        """
+        Closes the main application window.
+        """
+        self.close()
+
+    def show_about(self):
+        """
+        Displays the About dialog for the application.
+        """
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.about(self, "About PyCursor", 
+                         "PyCursor IDE\n\nA modern Python IDE built with PyQt6.\n\nVersion 1.0.0")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

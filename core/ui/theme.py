@@ -118,6 +118,11 @@ def get_stylesheet(theme='dark'):
         font-size: 13px;
     }}
     
+    /* Exclude QsciScintilla and QTextEdit from global font settings to prevent conflicts */
+    QsciScintilla, QTextEdit {{
+        font-family: inherit;
+    }}
+    
     QMenuBar {{
         background-color: {theme_colors['bg_secondary']};
         border-bottom: 1px solid {theme_colors['border']};

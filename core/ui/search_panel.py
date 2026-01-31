@@ -84,6 +84,8 @@ class SearchPanel(QWidget):
     """
     # Signal emitted when a user selects a specific match in the result tree
     match_activated = pyqtSignal(str, int) 
+    # Signal emitted when a user selects a file in the result tree
+    file_selected = pyqtSignal(str) 
 
     def __init__(self, root_path=None):
         super().__init__()
@@ -182,6 +184,7 @@ class SearchPanel(QWidget):
             rel = os.path.relpath(path, self.root_path)
             node = QTreeWidgetItem(self.tree, [os.path.basename(path)])
             node.setToolTip(0, rel)
+            node.setData(0, Qt.ItemDataRole.UserRole, path)  # Store full path for file nodes
             node.setExpanded(True)
             self.file_nodes[path] = node
             
@@ -190,7 +193,11 @@ class SearchPanel(QWidget):
         child.setData(0, Qt.ItemDataRole.UserRole, (path, line))
 
     def _on_item_clicked(self, item, col):
-        """Handels navigation to the specific file/line when a result is clicked."""
+        """Handles navigation to the specific file/line when a result is clicked."""
         data = item.data(0, Qt.ItemDataRole.UserRole)
         if isinstance(data, tuple):
+            # Match item clicked - emit match_activated with file path and line number
             self.match_activated.emit(data[0], data[1])
+        elif isinstance(data, str):
+            # File node clicked - emit file_selected with file path
+            self.file_selected.emit(data)

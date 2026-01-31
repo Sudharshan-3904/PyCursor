@@ -14,6 +14,7 @@ PyCursor IDE now includes a comprehensive keybindings system that allows you to 
 ## Default Keyboard Shortcuts
 
 ### File Operations
+
 - `Ctrl+O` - Open File
 - `Ctrl+K Ctrl+O` - Open Folder
 - `Ctrl+S` - Save File
@@ -22,6 +23,7 @@ PyCursor IDE now includes a comprehensive keybindings system that allows you to 
 - `Ctrl+N` - New File
 
 ### Edit Operations
+
 - `Ctrl+Z` - Undo
 - `Ctrl+Y` - Redo
 - `Ctrl+X` - Cut
@@ -37,6 +39,7 @@ PyCursor IDE now includes a comprehensive keybindings system that allows you to 
 - `Alt+Down` - Move Line Down
 
 ### View Operations
+
 - `Ctrl+B` - Toggle Explorer
 - `Ctrl+`` ` - Toggle Terminal
 - `Ctrl+Shift+A` - Toggle AI Assistant
@@ -45,6 +48,7 @@ PyCursor IDE now includes a comprehensive keybindings system that allows you to 
 - `Ctrl+0` - Reset Zoom
 
 ### Navigation
+
 - `Ctrl+G` - Go to Line
 - `Ctrl+Tab` - Next Tab
 - `Ctrl+Shift+Tab` - Previous Tab
@@ -53,19 +57,23 @@ PyCursor IDE now includes a comprehensive keybindings system that allows you to 
 - `Alt+Right` - Go Forward
 
 ### Run/Debug
+
 - `Ctrl+Shift+R` - Run File
 - `F5` - Start Debugging
 - `Shift+F5` - Stop Debugging
 
 ### AI Features
+
 - `Ctrl+Shift+I` - Open AI Chat
 - `Ctrl+Shift+E` - Explain Selected Code
 
 ### Terminal
+
 - `Ctrl+Shift+`` ` - New Terminal
 - `Ctrl+K` - Clear Terminal
 
 ### Application
+
 - `Ctrl+P` - Quick Open File
 - `Ctrl+Shift+P` - Show Command Palette
 - `Ctrl+,` - Open Settings
@@ -102,7 +110,7 @@ shortcut = kb_manager.get("file.save")  # Returns "Ctrl+Alt+S"
 conflicts = kb_manager.check_conflicts("Ctrl+S")
 
 # Register a new shortcut
-kb_manager.register_shortcut("my.custom.action", my_callback_function, widget_context)
+kb_manager.register("my.custom.action", my_callback_function, widget_context)
 ```
 
 ## Configuration File
@@ -146,7 +154,7 @@ DEFAULT_KEYBINDINGS = {
 ```python
 def setup_keybindings(self):
     # ... existing registrations ...
-    self.keybindings.register_shortcut("my.new.action", self.my_action_handler, self)
+    self.keybindings.register("my.new.action", self.my_action_handler, self)
 
 def my_action_handler(self):
     # Your action code here

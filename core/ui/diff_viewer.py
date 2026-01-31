@@ -46,7 +46,24 @@ class DiffViewer(QDialog):
         # Diff display
         self.diff_display = QTextEdit()
         self.diff_display.setReadOnly(True)
-        self.diff_display.setFont(QFont("Consolas", 10))
+        
+        # Create font with validation
+        font = QFont("Consolas", 10)
+        if not font.exactMatch():
+            # Fallback to monospace font if Consolas is not available
+            font = QFont("Monospace", 10)
+            if not font.exactMatch():
+                font = QFont("Courier New", 10)
+        
+        # Ensure font size is valid and positive
+        if font.pointSize() <= 0:
+            font.setPointSize(10)
+        
+        # Additional validation
+        if font.pointSizeF() <= 0.0:
+            font.setPointSizeF(10.0)
+        
+        self.diff_display.setFont(font)
         self.diff_display.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {COLORS['editor_bg']};

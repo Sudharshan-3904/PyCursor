@@ -63,6 +63,16 @@ class Terminal(QTextEdit):
         self.setFocus()
         self.append(self.prompt)
 
+    def __del__(self):
+        """
+        Properly terminates the shell process when the terminal is destroyed.
+        """
+        if hasattr(self, 'process') and self.process:
+            if self.process.state() == QProcess.ProcessState.Running:
+                self.process.terminate()
+                if not self.process.waitForFinished(3000):
+                    self.process.kill()
+
     def _detect_shell(self):
         """
         Determines the default system shell based on the current operating system.
