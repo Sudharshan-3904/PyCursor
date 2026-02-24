@@ -221,12 +221,10 @@ class HunkWidget(QWidget):
         
         # Set font to prevent invalid font sizes
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPixelSize(-1)
         font.setPointSize(10)
         font_info = QFontInfo(font)
         if font_info.pointSize() <= 0:
             font = QFont("Courier New", 10)
-            font.setPixelSize(-1)
             font.setPointSize(10)
         self.old_view.setFont(font)
         self.new_view.setFont(font)
@@ -252,12 +250,10 @@ class AISuggestionDialog(QDialog):
         layout = QVBoxLayout(self)
         # Define font
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPixelSize(-1)
         font.setPointSize(10)
         font_info = QFontInfo(font)
         if font_info.pointSize() <= 0:
             font = QFont("Courier New", 10)
-            font.setPixelSize(-1)
             font.setPointSize(10)
         if explanation:
             label = QLabel(f"<b>Explanation:</b><br>{explanation}")
@@ -322,12 +318,10 @@ class QAResponseDialog(QDialog):
         layout.addWidget(QLabel(f"<b>Question:</b><br>{question}"))
         # Define font
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPixelSize(-1)
         font.setPointSize(10)
         font_info = QFontInfo(font)
         if font_info.pointSize() <= 0:
             font = QFont("Courier New", 10)
-            font.setPixelSize(-1)
             font.setPointSize(10)
         ans_view = QTextEdit()
         ans_view.setReadOnly(True)

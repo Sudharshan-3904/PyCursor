@@ -31,20 +31,27 @@ class ExtensionsPanel(QWidget):
         # Header
         header = QWidget()
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 10, 10, 5)
-        
-        title = QLabel("EXTENSIONS")
-        title.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
-        header_layout.addWidget(title)
+        header_layout.setContentsMargins(10, 5, 10, 5)
         
         header_layout.addStretch()
         
-        # Install Button (Three dots style usually, but explicit here for clarity)
-        install_btn = QPushButton("...")
-        install_btn.setToolTip("Install from VSIX...")
-        install_btn.setFixedSize(25, 25)
-        install_btn.clicked.connect(self.install_from_vsix)
-        header_layout.addWidget(install_btn)
+        # Install Button
+        self.install_btn = QPushButton("Install VSIX...")
+        self.install_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['button_bg']};
+                color: {COLORS['text_primary']};
+                border: 1px solid {COLORS['border']};
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['button_hover']};
+            }}
+        """)
+        self.install_btn.clicked.connect(self.install_from_vsix)
+        header_layout.addWidget(self.install_btn)
         
         layout.addWidget(header)
 
@@ -112,7 +119,11 @@ class ExtensionsPanel(QWidget):
     def add_extension_item(self, name, author, description, installed):
         item = QListWidgetItem()
         widget = ExtensionItemWidget(name, author, description, installed)
-        item.setSizeHint(widget.sizeHint())
+        # Connect the install button if it exists
+        if not installed:
+            widget.install_btn.clicked.connect(self.install_from_vsix)
+            
+        item.setSizeHint(QSize(0, 70))  # Force a reasonable height
         self.extension_list.addItem(item)
         self.extension_list.setItemWidget(item, widget)
 
@@ -177,12 +188,20 @@ class ExtensionItemWidget(QWidget):
         layout.addLayout(info_layout, stretch=1)
         
         if not installed:
-            install_btn = QPushButton("Install")
-            install_btn.setStyleSheet(f"""
-                background-color: {COLORS['accent_blue']};
-                color: white;
-                border: none;
-                border-radius: 2px;
-                padding: 4px 8px;
+            self.install_btn = QPushButton("Install")
+            self.install_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.install_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['accent_blue']};
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 5px 12px;
+                    font-weight: bold;
+                    font-size: 11px;
+                }}
+                QPushButton:hover {{
+                    background-color: {COLORS['accent_blue']}cc;
+                }}
             """)
-            layout.addWidget(install_btn)
+            layout.addWidget(self.install_btn)

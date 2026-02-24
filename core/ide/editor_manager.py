@@ -114,11 +114,19 @@ class EditorManager:
     def _write_to_disk(self, path, editor):
         """
         Internal utility for physical file write operations.
+        Updates the AI RAG index after successful save.
         """
         try:
+            content = editor.text()
             with open(path, "w", encoding="utf-8") as f:
-                f.write(editor.text())
+                f.write(content)
             editor.setModified(False)
+            
+            # Update RAG Index
+            if hasattr(self.main_window, 'ai_widget'):
+                rag = self.main_window.ai_widget.context_manager.rag_manager
+                if rag:
+                    rag.add_documents(path, content)
         except Exception as e:
             print(f"Error persisting file: {e}")
 

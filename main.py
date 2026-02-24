@@ -6,13 +6,24 @@ without manual restarts, while orchestrating the primary QApplication loop.
 
 import sys
 import os
+
+# Suppress TensorFlow logging and oneDNN operations
+# Suppress TensorFlow loading and logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
+# Prevent tensorflow from being loaded by blocking it in sys.modules
+sys.modules['tensorflow'] = None
+
 import importlib
 import time
+import torch
+import traceback
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtGui import QFont, QFontDatabase, QFontInfo
+from PyQt6.QtWidgets import QApplication, QSplashScreen
+from PyQt6.QtCore import QObject, pyqtSignal, Qt
+from PyQt6.QtGui import QFont, QPixmap
 
 from core import app_main
 
@@ -118,6 +129,7 @@ class HotReloader(QObject):
             print("[HotReload] Application state refreshed successfully.")
         except Exception as e:
             print(f"[HotReload] Error during refresh: {e}")
+            traceback.print_exc()
 
 def main():
     """
@@ -125,16 +137,24 @@ def main():
     """
     qapp = QApplication(sys.argv)
     
+    # Show Splash Screen
+    logo_path = os.path.join("assets", "icons", "darModeLogo.png")
+    splash = None
+    if os.path.exists(logo_path):
+        pixmap = QPixmap(logo_path)
+        splash = QSplashScreen(pixmap, Qt.WindowType.WindowStaysOnTopHint)
+        splash.show()
+    
     # Set application-wide font to prevent invalid font sizes
-    app_font = QFont()
-    app_font.setFamily("Times New Roman")
-    app_font.setPixelSize(-1)
-    app_font.setPointSize(11)
+    app_font = QFont("Segoe UI", 11)
     qapp.setFont(app_font)
     
     # Initialize the Hot-Reloader which manages the PyCursorMain instance
     reloader = HotReloader(qapp)
     reloader.start()
+
+    if splash:
+        splash.finish(reloader.main_window)
 
     try:
         status = qapp.exec()

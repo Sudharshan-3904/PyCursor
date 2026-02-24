@@ -6,42 +6,47 @@ and file system I/O specialized for development workflows.
 
 import os
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QPixmap, QPainter
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
 
-def load_icon(name: str, size: int = 20, recolor_to_white: bool = True) -> QIcon:
+def load_icon(name: str, size: int = 20, color: QColor = None) -> QIcon:
     """
     Loads an SVG or PNG icon from the assets directory and optionally applies 
-    a color transformation to match the application's dark theme aesthetics.
+    a color transformation to match the application's theme aesthetics.
     """
     # Resolve absolute path to the icon asset
     base_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icons")
     icon_path = os.path.abspath(os.path.join(base_dir, name))
     
     if not os.path.exists(icon_path):
-        print(f"[UI Warning] Asset not found: {icon_path}")
-        return QIcon()
+        # Fallback to SVG if PNG doesn't exist or vice versa
+        alt_name = name.replace(".png", ".svg") if name.endswith(".png") else name.replace(".svg", ".png")
+        icon_path = os.path.abspath(os.path.join(base_dir, alt_name))
+        
+        if not os.path.exists(icon_path):
+            print(f"[UI Warning] Asset not found: {name}")
+            return QIcon()
 
     # Load and scale the pixmap for high-DPI awareness
     pixmap = QPixmap(icon_path).scaled(
-        size, size, 
+        size * 2, size * 2, # Scale for better quality before tinting
         Qt.AspectRatioMode.KeepAspectRatio, 
         Qt.TransformationMode.SmoothTransformation
     )
 
-    # Apply tinting: Useful for converting dark assets to light for visibility on dark backgrounds
-    if recolor_to_white:
-        white_pixmap = QPixmap(pixmap.size())
-        white_pixmap.fill(Qt.GlobalColor.transparent)
+    # Apply tinting
+    if color:
+        tinted_pixmap = QPixmap(pixmap.size())
+        tinted_pixmap.fill(Qt.GlobalColor.transparent)
         
-        painter = QPainter(white_pixmap)
+        painter = QPainter(tinted_pixmap)
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-        painter.fillRect(white_pixmap.rect(), Qt.GlobalColor.white)
+        painter.fillRect(tinted_pixmap.rect(), color)
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
         painter.drawPixmap(0, 0, pixmap)
         painter.end()
-        return QIcon(white_pixmap)
+        return QIcon(tinted_pixmap.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
-    return QIcon(pixmap)
+    return QIcon(pixmap.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
 def load_systemPrompt(filename: str = "generalPrompt.txt") -> str:
     """

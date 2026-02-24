@@ -66,6 +66,12 @@ class StartupThread(QThread):
                     self.git_ready.emit(True, status, branches, current_branch)
                 else:
                     self.git_ready.emit(False, None, None, None)
+            
+            # Trigger RAG Indexing
+            from core.ai.context_manager import ContextManager
+            cm = ContextManager(self.project_path)
+            if cm.rag_manager:
+                cm.rag_manager.index_project()
         except Exception:
             self.git_ready.emit(False, None, None, None)
 
@@ -78,6 +84,9 @@ class PyCursorMain(QMainWindow):
         super().__init__()
         self.setWindowTitle("PyCursor IDE")
         self.resize(1400, 900)
+        
+        # Set Window Icon
+        self.setWindowIcon(load_icon("darModeLogo.png"))
         
         # Configuration setup
         self.settings_path = os.path.join(
@@ -118,6 +127,11 @@ class PyCursorMain(QMainWindow):
         self.search_panel = SearchPanel(root_path=self.project_path)
         self.search_panel.file_selected.connect(self.open_file_in_tab)
         self.sidebar_stack.addWidget(self.search_panel)
+
+        # Debug Panel
+        from core.ui.debug_panel import DebugPanel
+        self.debug_panel = DebugPanel()
+        self.sidebar_stack.addWidget(self.debug_panel)
 
         # Sidebar Dock
         self.sidebar_dock = QDockWidget("EXPLORER", self)
@@ -174,20 +188,42 @@ class PyCursorMain(QMainWindow):
 
     def apply_theme(self, theme_name):
         """
-        Updates the application stylesheet and refreshes all open editor instances.
+        Updates the application stylesheet, icons, and refreshes all open editor instances.
         """
         self.setStyleSheet(get_stylesheet(theme=theme_name))
+        self.refresh_icons(theme_name)
+        
         if hasattr(self, 'editor_manager'):
              for i in range(self.editor_tabs.count()):
                  editor = self.editor_tabs.widget(i)
                  if hasattr(editor, 'refresh_theme'):
                      editor.refresh_theme(theme_name)
         
+        if hasattr(self, 'sidebar'):
+            if hasattr(self.sidebar, 'refresh_icons'): self.sidebar.refresh_icons(theme_name)
+        
+        if hasattr(self, 'ai_widget'):
+            if hasattr(self.ai_widget, 'refresh_icons'): self.ai_widget.refresh_icons(theme_name)
+
         if hasattr(self, '_settings'):
             self._settings["theme"] = theme_name
             self._save_settings()
 
         QTimer.singleShot(500, self.show_welcome_screen)
+
+    def refresh_icons(self, theme_name):
+        """
+        Updates all top-level activity bar and UI icons to match theme palette.
+        """
+        from core.ui.theme import get_icon_color
+        color = get_icon_color(theme_name)
+        
+        if hasattr(self, 'explorer_action'): self.explorer_action.setIcon(load_icon("folder.svg", color=color))
+        if hasattr(self, 'search_action'): self.search_action.setIcon(load_icon("search.svg", color=color))
+        if hasattr(self, 'git_action'): self.git_action.setIcon(load_icon("git.svg", color=color))
+        if hasattr(self, 'extensions_action'): self.extensions_action.setIcon(load_icon("extensions.svg", color=color))
+        if hasattr(self, 'debug_action'): self.debug_action.setIcon(load_icon("debug.svg", color=color))
+        if hasattr(self, 'logs_action'): self.logs_action.setIcon(load_icon("output.svg", color=color))
 
     def show_welcome_screen(self, force=False):
         """
@@ -243,6 +279,7 @@ class PyCursorMain(QMainWindow):
         activity_bar.setFloatable(False)
         activity_bar.setOrientation(Qt.Orientation.Vertical)
         activity_bar.setIconSize(QSize(28, 28))
+        activity_bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, activity_bar)
         
@@ -270,6 +307,12 @@ class PyCursorMain(QMainWindow):
         self.extensions_action.setCheckable(True)
         self.extensions_action.triggered.connect(lambda: self.toggle_view("extensions"))
         activity_bar.addAction(self.extensions_action)
+        
+        # Debugger Toggle
+        self.debug_action = QAction(load_icon("debug.svg"), "Run and Debug", self)
+        self.debug_action.setCheckable(True)
+        self.debug_action.triggered.connect(lambda: self.toggle_view("debug"))
+        activity_bar.addAction(self.debug_action)
         
         # Logs Toggle
         self.logs_action = QAction(load_icon("output.svg"), "App Logs", self)
@@ -304,6 +347,7 @@ class PyCursorMain(QMainWindow):
             "git": self.git_action,
             "logs": self.logs_action,
             "extensions": self.extensions_action,
+            "debug": self.debug_action,
         }
         
         if view_name in sidebar_actions:
@@ -326,8 +370,8 @@ class PyCursorMain(QMainWindow):
                         if name != view_name: act.setChecked(False)
                     
                     self.sidebar_dock.setVisible(True)
-                    idx_map = {"explorer": 0, "git": 1, "logs": 2, "extensions": 3, "search": 4}
-                    title_map = {"explorer": "EXPLORER", "git": "SOURCE CONTROL", "logs": "APP LOGS", "extensions": "EXTENSIONS", "search": "SEARCH"}
+                    idx_map = {"explorer": 0, "git": 1, "logs": 2, "extensions": 3, "search": 4, "debug": 5}
+                    title_map = {"explorer": "EXPLORER", "git": "SOURCE CONTROL", "logs": "APP LOGS", "extensions": "EXTENSIONS", "search": "SEARCH", "debug": "DEBUG"}
                     
                     self.sidebar_stack.setCurrentIndex(idx_map[view_name])
                     self.sidebar_dock.setWindowTitle(title_map[view_name])
@@ -436,6 +480,14 @@ class PyCursorMain(QMainWindow):
 
         if hasattr(self.sidebar, "set_root_path"): self.sidebar.set_root_path(folder)
         if hasattr(self, 'git_panel'): self.git_panel.set_repository(folder)
+        
+        # Update AI Context Manager and trigger re-index
+        if hasattr(self, 'ai_widget'):
+            self.ai_widget.context_manager.set_project_path(folder)
+            # Indexing will happen on demand or via Background thread
+            # For now, let's trigger a one-time index if RAG is on
+            if self.ai_widget.context_manager.rag_enabled:
+                self.ai_widget.context_manager.rag_manager.index_project()
 
     def open_file_in_tab(self, file_path: str, line_number: int = None):
         """

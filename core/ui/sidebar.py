@@ -68,6 +68,8 @@ class SideBar(QWidget):
         self.filter_btn = self._create_toolbar_button("filter.png", "Filter Files", self.toggle_filter)
         self.filter_btn.setCheckable(True)
 
+        self.toolbar_buttons = {"refresh": refresh_btn, "new_file": new_file_btn, "new_folder": new_folder_btn, "filter": self.filter_btn}
+        
         toolbar_layout.addWidget(self.dir_label)
         toolbar_layout.addWidget(refresh_btn)
         toolbar_layout.addWidget(new_file_btn)
@@ -138,6 +140,24 @@ class SideBar(QWidget):
         self.dir_label.setText(os.path.basename(self.root_path) or self.root_path)
         self.model.setRootPath(self.root_path)
         self.refresh_tree()
+
+    def refresh_icons(self, theme_name):
+        """
+        Updates toolbar icons to match the current theme color.
+        """
+        from core.ui.theme import get_icon_color
+        color = get_icon_color(theme_name)
+        
+        icon_map = {
+            "refresh": "refresh.png",
+            "new_file": "new_file.png",
+            "new_folder": "new_folder.png",
+            "filter": "filter.png"
+        }
+        
+        for key, btn in self.toolbar_buttons.items():
+            if key in icon_map:
+                btn.setIcon(load_icon(icon_map[key], color=color))
 
     def toggle_filter(self):
         """

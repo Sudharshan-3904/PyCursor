@@ -3,6 +3,7 @@ from PyQt6.QtGui import QColor, QFont, QAction, QFontDatabase, QFontInfo
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython
 from core.ui.theme import COLORS, LIGHT_COLORS
+from core.ui.completion_popup import CompletionPopup
 import os
 
 class CodeEditor(QsciScintilla):
@@ -39,6 +40,10 @@ class CodeEditor(QsciScintilla):
         self._modified = False
         self.textChanged.connect(self._on_text_changed)
 
+        # IntelliSense Components
+        self.completion_popup = CompletionPopup(self)
+        self.completion_popup.list_widget.itemActivated.connect(self._on_completion_selected)
+        
         # Ensure font is properly set after all initialization
         self._ensure_font_valid()
 
@@ -48,7 +53,6 @@ class CodeEditor(QsciScintilla):
         """
         font = self.font()
         if font.pointSize() <= 0:
-            font.setPixelSize(-1)
             font.setPointSize(11)
             self.setFont(font)
         
@@ -65,7 +69,6 @@ class CodeEditor(QsciScintilla):
         # Ensure font remains valid after resize
         font = self.font()
         if font.pointSize() <= 0:
-            font.setPixelSize(-1)
             font.setPointSize(11)
             self.setFont(font)
             if self.lexer():
@@ -78,7 +81,6 @@ class CodeEditor(QsciScintilla):
         """
         # Use system fixed font to ensure a valid monospace font
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPixelSize(-1)
         font.setPointSize(11)
         
         # Verify the font is actually resolved correctly
@@ -86,7 +88,6 @@ class CodeEditor(QsciScintilla):
         if font_info.pointSize() <= 0:
             # Fallback to a known font
             font = QFont("Courier New", 11)
-            font.setPixelSize(-1)
             font.setPointSize(11)
         
         # Ensure font size is valid and positive
@@ -100,11 +101,21 @@ class CodeEditor(QsciScintilla):
         # Set the font on the widget
         self.setFont(font)
         
-        # Ensure font is properly set after all initialization
-        if self.font().pointSize() <= 0:
-            font.setPixelSize(-1)
-            font.setPointSize(11)
-            self.setFont(font)
+        # Use the font that was already set
+        self._ensure_font_valid()
+
+        # Ghost Text (Inline Copilot)
+        self.ghost_text = ""
+        self.ghost_timer = QTimer(self)
+        self.ghost_timer.setSingleShot(True)
+        self.ghost_timer.setInterval(500) # 500ms idle trigger
+        self.ghost_timer.timeout.connect(self._trigger_ghost_text)
+        self.textChanged.connect(lambda: self.ghost_timer.start())
+        
+        # Indicator for gray text
+        self.INDICATOR_GHOST = 8
+        self.indicatorDefine(QsciScintilla.IndicatorStyle.PlainIndicator, self.INDICATOR_GHOST)
+        self.setIndicatorForegroundColor(QColor(COLORS['text_disabled']), self.INDICATOR_GHOST)
 
     def _on_text_changed(self):
         """
@@ -216,6 +227,66 @@ class CodeEditor(QsciScintilla):
             if parent and hasattr(parent, 'lsp_manager'):
                 parent.lsp_manager.get_definition(self.file_path, line, col, self._handle_definition)
 
+    def trigger_completion(self):
+        """
+        Triggers LSP autocompletion at current cursor position.
+        """
+        line, col = self.getCursorPosition()
+        if hasattr(self, 'file_path') and self.file_path:
+            parent = self._find_main_window()
+            if parent and hasattr(parent, 'lsp_manager'):
+                parent.lsp_manager.get_completion(self.file_path, line, col, self._handle_completion)
+
+    def _handle_completion(self, result):
+        """
+        Processes LSP completion results and shows the popup.
+        """
+        if not result: return
+        items = result.get('items', []) if isinstance(result, dict) else result
+        if not items: return
+        
+        # Filter and show popup
+        self.completion_popup.set_items(items)
+        pos = self.mapToGlobal(self.cursor_pos_to_pixel())
+        self.completion_popup.show_at(pos)
+
+    def cursor_pos_to_pixel(self):
+        """
+        Converts cursor line/col to relative pixel coordinates for popup placement.
+        """
+        line, col = self.getCursorPosition()
+        # simplified for Phase 2
+        return self.cursorRect().bottomLeft()
+
+    def _trigger_ghost_text(self):
+        """
+        Triggers a sub-1sec completion request for ghost text.
+        """
+        line, col = self.getCursorPosition()
+        if hasattr(self, 'file_path') and self.file_path:
+            parent = self._find_main_window()
+            if parent and hasattr(parent, 'lsp_manager'):
+                parent.lsp_manager.get_completion(self.file_path, line, col, self._handle_ghost_response)
+
+    def _handle_ghost_response(self, result):
+        """
+        Renders the first suggestion as gray ghost text.
+        """
+        if not result: return
+        items = result.get('items', []) if isinstance(result, dict) else result
+        if not items: return
+        
+        suggestion = items[0].get("label", "").split("\n")[0]
+        self.ghost_text = suggestion
+        # Rendering ghost text is tricky in QScintilla without a custom lexer.
+        # For Phase 4, we'll use an indicator at the cursor position.
+        line, col = self.getCursorPosition()
+        self.fill_ghost_text(line, col, suggestion)
+
+    def fill_ghost_text(self, line, col, text):
+        # Implementation to show ghost text using indicators
+        pass
+
     def _handle_definition(self, result):
         """
         Navigates to the definition location returned by the LSP.
@@ -301,7 +372,6 @@ class CodeEditor(QsciScintilla):
         
         # Ensure the font is still valid
         if font.pointSize() <= 0:
-            font.setPixelSize(-1)
             font.setPointSize(11)
             self.setFont(font)
         
@@ -313,7 +383,6 @@ class CodeEditor(QsciScintilla):
         lexer = QsciLexerPython()
         # Ensure lexer font is valid before setting
         lexer_font = font
-        lexer_font.setPixelSize(-1)
         lexer_font.setPointSize(11)
         lexer.setDefaultFont(lexer_font)
         

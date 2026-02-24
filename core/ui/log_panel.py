@@ -28,12 +28,10 @@ class LogPanel(QWidget):
         
         # Set font to prevent invalid font sizes
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPixelSize(-1)
         font.setPointSize(11)
         font_info = QFontInfo(font)
         if font_info.pointSize() <= 0:
             font = QFont("Courier New", 11)
-            font.setPixelSize(-1)
             font.setPointSize(11)
         self.log_area.setFont(font)
         
