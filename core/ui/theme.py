@@ -209,8 +209,20 @@ def get_stylesheet(theme='dark'):
         color: {theme_colors['accent_blue']};
     }}
     
-    QPushButton#SearchOptionBtn:hover {{
+    QPushButton#SearchOptionBtn:hover, QPushButton#AIChatControl:hover {{
         background-color: {theme_colors['bg_elevated']};
+    }}
+    
+    QPushButton#AIChatControl {{
+        background-color: {theme_colors['bg_elevated']};
+        border: 1px solid {theme_colors['border']};
+        padding: 4px;
+        border-radius: 4px;
+    }}
+    
+    QPushButton#AIChatControl:checked {{
+        background-color: {theme_colors['bg_selection']};
+        border: 1px solid {theme_colors['accent_blue']};
     }}
     
     QLineEdit, QTextEdit {{

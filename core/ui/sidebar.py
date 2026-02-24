@@ -46,10 +46,6 @@ class SideBar(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(2)
 
-        # Explorer section header
-        header = QLabel("EXPLORER")
-        header.setFixedHeight(20)
-        layout.addWidget(header)
 
         # Navigation toolbar
         toolbar = QWidget()

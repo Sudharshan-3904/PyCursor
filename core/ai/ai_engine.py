@@ -34,6 +34,8 @@ class AIEngine(QWidget):
         self.local_icon = load_icon("local.png")
         self.api_icon = load_icon("api.png")
         self.model_icon = load_icon("model.png")
+        self.agent_icon = load_icon("agent.svg")
+        self.brain_icon = load_icon("brain.svg")
 
         # Backend Handlers
         self.local_model_handler = LocalModelHandler()
@@ -89,30 +91,40 @@ class AIEngine(QWidget):
 
         # Source Toggle (Local vs Cloud API)
         self.api_local_btn = QPushButton()
+        self.api_local_btn.setObjectName("AIChatControl")
         self.api_local_btn.setIcon(self.local_icon)
         self.api_local_btn.setCheckable(True)
         self.api_local_btn.setFixedHeight(28)
+        self.api_local_btn.setToolTip("Toggle API/Local")
         self.api_local_btn.clicked.connect(self.toggle_api_local)
         toolbar.addWidget(self.api_local_btn)
         
         # Agent Mode Toggle (Grants FS access permissions)
-        self.agent_mode_btn = QPushButton("Agent")
+        self.agent_mode_btn = QPushButton()
+        self.agent_mode_btn.setObjectName("AIChatControl")
+        self.agent_mode_btn.setIcon(self.agent_icon)
         self.agent_mode_btn.setCheckable(True)
         self.agent_mode_btn.setFixedHeight(28)
+        self.agent_mode_btn.setToolTip("Agentic Mode")
         self.agent_mode_btn.clicked.connect(self.toggle_agent_mode)
         toolbar.addWidget(self.agent_mode_btn)
 
         # Brain Mode Toggle (Enables RAG)
-        self.brain_mode_btn = QPushButton("Brain")
+        self.brain_mode_btn = QPushButton()
+        self.brain_mode_btn.setObjectName("AIChatControl")
+        self.brain_mode_btn.setIcon(self.brain_icon)
         self.brain_mode_btn.setCheckable(True)
         self.brain_mode_btn.setFixedHeight(28)
+        self.brain_mode_btn.setToolTip("Brain Mode (Project Index)")
         self.brain_mode_btn.clicked.connect(self.toggle_brain_mode)
         toolbar.addWidget(self.brain_mode_btn)
 
         # Model Selector Menu
         self.model_btn = QPushButton()
+        self.model_btn.setObjectName("AIChatControl")
         self.model_btn.setIcon(self.model_icon)
         self.model_btn.setFixedHeight(28)
+        self.model_btn.setToolTip("Select Model")
         self.model_menu = QMenu(self)
         self.model_btn.setMenu(self.model_menu)
         toolbar.addWidget(self.model_btn)
@@ -142,6 +154,8 @@ class AIEngine(QWidget):
         
         self.send_btn.setIcon(load_icon("send.png", color=color))
         self.model_btn.setIcon(load_icon("model.png", color=color))
+        self.agent_mode_btn.setIcon(load_icon("agent.svg", color=color))
+        self.brain_mode_btn.setIcon(load_icon("brain.svg", color=color))
         
         # Source Toggle Icon
         source_icon = "local.png" if not self.using_api else "api.png"
