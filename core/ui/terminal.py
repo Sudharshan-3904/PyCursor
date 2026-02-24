@@ -24,12 +24,10 @@ class Terminal(QTextEdit):
         
         # Set font to prevent invalid font sizes
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPixelSize(-1)
         font.setPointSize(10)
         font_info = QFontInfo(font)
         if font_info.pointSize() <= 0:
             font = QFont("Courier New", 10)
-            font.setPixelSize(-1)
             font.setPointSize(10)
         self.setFont(font)
 

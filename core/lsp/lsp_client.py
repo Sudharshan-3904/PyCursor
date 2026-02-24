@@ -186,13 +186,46 @@ class LSPManager(QObject):
         self.initialized = True
         self.client.send_notification("initialized", {})
 
-    def navigate_to_definition(self, file_path, line, col, callback):
+    def get_definition(self, file_path, line, col, callback):
         """
         Requests the definition location for a symbol at the specified coordinates.
         """
         if not self.initialized: return
         uri = f"file:///{file_path.replace('\\', '/')}"
         self.client.send_request("textDocument/definition", {
+            "textDocument": {"uri": uri},
+            "position": {"line": line, "character": col}
+        }, callback)
+
+    def get_completion(self, file_path, line, col, callback):
+        """
+        Requests code completion suggestions at the specified coordinates.
+        """
+        if not self.initialized: return
+        uri = f"file:///{file_path.replace('\\', '/')}"
+        self.client.send_request("textDocument/completion", {
+            "textDocument": {"uri": uri},
+            "position": {"line": line, "character": col}
+        }, callback)
+
+    def get_hover(self, file_path, line, col, callback):
+        """
+        Requests hover documentation for the symbol at the specified coordinates.
+        """
+        if not self.initialized: return
+        uri = f"file:///{file_path.replace('\\', '/')}"
+        self.client.send_request("textDocument/hover", {
+            "textDocument": {"uri": uri},
+            "position": {"line": line, "character": col}
+        }, callback)
+
+    def get_signature_help(self, file_path, line, col, callback):
+        """
+        Requests function signature information at the specified coordinates.
+        """
+        if not self.initialized: return
+        uri = f"file:///{file_path.replace('\\', '/')}"
+        self.client.send_request("textDocument/signatureHelp", {
             "textDocument": {"uri": uri},
             "position": {"line": line, "character": col}
         }, callback)

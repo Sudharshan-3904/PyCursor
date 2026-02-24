@@ -100,6 +100,21 @@ LIGHT_COLORS = {
     'sidebar_selected': '#acb0be',
 }
 
+def get_color(color_name, theme='dark'):
+    """
+    Retrieves a specific color from the current theme palette.
+    """
+    palette = COLORS if theme == 'dark' else LIGHT_COLORS
+    return palette.get(color_name, '#ffffff')
+
+def get_icon_color(theme='dark'):
+    """
+    Returns the standard color for UI icons in the current theme.
+    """
+    from PyQt6.QtGui import QColor
+    color_hex = get_color('text_secondary', theme)
+    return QColor(color_hex)
+
 def get_stylesheet(theme='dark'):
     """
     Generates the comprehensive application-wide Qt Stylesheet (QSS).
@@ -114,7 +129,7 @@ def get_stylesheet(theme='dark'):
     QWidget {{
         background-color: {theme_colors['bg_primary']};
         color: {theme_colors['text_primary']};
-        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
         font-size: 10pt;
     }}
     
@@ -179,6 +194,35 @@ def get_stylesheet(theme='dark'):
     
     QPushButton:hover {{
         background-color: {theme_colors['button_hover']};
+    }}
+    
+    QPushButton#SearchOptionBtn {{
+        background-color: transparent;
+        padding: 0;
+        border: 1px solid transparent;
+        color: {theme_colors['text_secondary']};
+    }}
+    
+    QPushButton#SearchOptionBtn:checked {{
+        background-color: {theme_colors['bg_selection']};
+        border: 1px solid {theme_colors['accent_blue']};
+        color: {theme_colors['accent_blue']};
+    }}
+    
+    QPushButton#SearchOptionBtn:hover, QPushButton#AIChatControl:hover {{
+        background-color: {theme_colors['bg_elevated']};
+    }}
+    
+    QPushButton#AIChatControl {{
+        background-color: {theme_colors['bg_elevated']};
+        border: 1px solid {theme_colors['border']};
+        padding: 4px;
+        border-radius: 4px;
+    }}
+    
+    QPushButton#AIChatControl:checked {{
+        background-color: {theme_colors['bg_selection']};
+        border: 1px solid {theme_colors['accent_blue']};
     }}
     
     QLineEdit, QTextEdit {{

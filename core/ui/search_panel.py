@@ -143,11 +143,10 @@ class SearchPanel(QWidget):
     def _create_option_btn(self, label, tip):
         """Helper to create consistent toggle buttons for search modifiers."""
         btn = QPushButton(label)
+        btn.setObjectName("SearchOptionBtn")
         btn.setCheckable(True)
         btn.setToolTip(tip)
         btn.setFixedSize(26, 26)
-        btn.setStyleSheet(f"QPushButton {{ background: transparent; border-radius: 4px; }} "
-                          f"QPushButton:checked {{ background: {COLORS['bg_selection']}; border: 1px solid {COLORS['accent_blue']}; }}")
         return btn
 
     def execute_search(self):

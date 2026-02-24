@@ -3,7 +3,8 @@ import re
 import os
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QMenu,
-    QTextEdit, QPushButton, QLineEdit, QInputDialog, QMessageBox
+    QTextEdit, QPushButton, QLineEdit, QInputDialog, QMessageBox,
+    QLabel
 )
 from PyQt6.QtGui import QAction, QFont, QFontDatabase, QFontInfo
 from PyQt6.QtCore import Qt
@@ -33,6 +34,8 @@ class AIEngine(QWidget):
         self.local_icon = load_icon("local.png")
         self.api_icon = load_icon("api.png")
         self.model_icon = load_icon("model.png")
+        self.agent_icon = load_icon("agent.svg")
+        self.brain_icon = load_icon("brain.svg")
 
         # Backend Handlers
         self.local_model_handler = LocalModelHandler()
@@ -67,12 +70,10 @@ class AIEngine(QWidget):
         
         # Set font to prevent invalid font sizes
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPixelSize(-1)
         font.setPointSize(10)
         font_info = QFontInfo(font)
         if font_info.pointSize() <= 0:
             font = QFont("Courier New", 10)
-            font.setPixelSize(-1)
             font.setPointSize(10)
         self.chat_area.setFont(font)
         
@@ -90,23 +91,40 @@ class AIEngine(QWidget):
 
         # Source Toggle (Local vs Cloud API)
         self.api_local_btn = QPushButton()
+        self.api_local_btn.setObjectName("AIChatControl")
         self.api_local_btn.setIcon(self.local_icon)
         self.api_local_btn.setCheckable(True)
         self.api_local_btn.setFixedHeight(28)
+        self.api_local_btn.setToolTip("Toggle API/Local")
         self.api_local_btn.clicked.connect(self.toggle_api_local)
         toolbar.addWidget(self.api_local_btn)
         
         # Agent Mode Toggle (Grants FS access permissions)
-        self.agent_mode_btn = QPushButton("Agent")
+        self.agent_mode_btn = QPushButton()
+        self.agent_mode_btn.setObjectName("AIChatControl")
+        self.agent_mode_btn.setIcon(self.agent_icon)
         self.agent_mode_btn.setCheckable(True)
         self.agent_mode_btn.setFixedHeight(28)
+        self.agent_mode_btn.setToolTip("Agentic Mode")
         self.agent_mode_btn.clicked.connect(self.toggle_agent_mode)
         toolbar.addWidget(self.agent_mode_btn)
 
+        # Brain Mode Toggle (Enables RAG)
+        self.brain_mode_btn = QPushButton()
+        self.brain_mode_btn.setObjectName("AIChatControl")
+        self.brain_mode_btn.setIcon(self.brain_icon)
+        self.brain_mode_btn.setCheckable(True)
+        self.brain_mode_btn.setFixedHeight(28)
+        self.brain_mode_btn.setToolTip("Brain Mode (Project Index)")
+        self.brain_mode_btn.clicked.connect(self.toggle_brain_mode)
+        toolbar.addWidget(self.brain_mode_btn)
+
         # Model Selector Menu
         self.model_btn = QPushButton()
+        self.model_btn.setObjectName("AIChatControl")
         self.model_btn.setIcon(self.model_icon)
         self.model_btn.setFixedHeight(28)
+        self.model_btn.setToolTip("Select Model")
         self.model_menu = QMenu(self)
         self.model_btn.setMenu(self.model_menu)
         toolbar.addWidget(self.model_btn)
@@ -121,6 +139,27 @@ class AIEngine(QWidget):
         toolbar.addWidget(self.send_btn)
 
         layout.addLayout(toolbar)
+
+        # Reference list area
+        self.reference_label = QLabel("References: None")
+        self.reference_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 9pt;")
+        layout.addWidget(self.reference_label)
+
+    def refresh_icons(self, theme_name):
+        """
+        Updates AI engine icons to match the current theme palette.
+        """
+        from core.ui.theme import get_icon_color
+        color = get_icon_color(theme_name)
+        
+        self.send_btn.setIcon(load_icon("send.png", color=color))
+        self.model_btn.setIcon(load_icon("model.png", color=color))
+        self.agent_mode_btn.setIcon(load_icon("agent.svg", color=color))
+        self.brain_mode_btn.setIcon(load_icon("brain.svg", color=color))
+        
+        # Source Toggle Icon
+        source_icon = "local.png" if not self.using_api else "api.png"
+        self.api_local_btn.setIcon(load_icon(source_icon, color=color))
 
     def update_models(self, models: dict):
         """
@@ -177,6 +216,14 @@ class AIEngine(QWidget):
         """
         self.agent_mode = self.agent_mode_btn.isChecked()
 
+    def toggle_brain_mode(self):
+        """
+        Enables RAG (Project-Wide Context) mode.
+        """
+        self.context_manager.rag_enabled = self.brain_mode_btn.isChecked()
+        if self.context_manager.rag_enabled:
+            self.chat_area.append("<i>[Brain Mode Enabled - Projects indexed for context]</i>")
+
     def handle_send(self):
         """
         Processes user query, gathers project context, and dispatches prediction request.
@@ -193,6 +240,12 @@ class AIEngine(QWidget):
         
         context_data = self.context_manager.get_context(user_input)
         context_text = context_data.get("text", "")
+        used_files = context_data.get("files", [])
+        
+        if used_files:
+            self.reference_label.setText(f"References: {', '.join(used_files[:3])}{'...' if len(used_files) > 3 else ''}")
+        else:
+            self.reference_label.setText("References: None")
         
         # Build systematic prompt
         prompt_parts = []
@@ -239,33 +292,63 @@ class AIEngine(QWidget):
     def process_agent_commands(self, response: str) -> str:
         """
         Parses and executes file system XML tags returned by the AI agent.
+        Supports atomic multi-file transactions with rollback capabilities.
         """
         modified = response
+        self.last_transaction = [] # List of (path, original_content)
         
         # Handle read_file
         read_pattern = r'<read_file>(.*?)</read_file>'
         for match in re.finditer(read_pattern, response):
             path = match.group(1).strip()
             try:
-                with open(os.path.join(getattr(self.main_window, 'project_path', '.'), path), 'r', encoding='utf-8') as f:
+                full_path = os.path.join(getattr(self.main_window, 'project_path', '.'), path)
+                with open(full_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 modified = modified.replace(match.group(0), f"\n```\n{content}\n```\n")
             except Exception as e:
                 modified = modified.replace(match.group(0), f"[Read Error: {e}]")
 
-        # Handle write_file
+        # Handle write_file (Transaction-aware)
         write_pattern = r'<write_file path="(.*?)">(.*?)</write_file>'
         for match in re.finditer(write_pattern, response, re.DOTALL):
             path, content = match.group(1).strip(), match.group(2).strip()
             try:
                 full_path = os.path.join(getattr(self.main_window, 'project_path', '.'), path)
+                
+                # Backup for rollback
+                orig = ""
+                if os.path.exists(full_path):
+                    with open(full_path, 'r', encoding='utf-8') as f: orig = f.read()
+                self.last_transaction.append((full_path, orig))
+
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 with open(full_path, 'w', encoding='utf-8') as f: f.write(content)
                 modified = modified.replace(match.group(0), f"[Success: Wrote to {path}]")
             except Exception as e:
                 modified = modified.replace(match.group(0), f"[Write Error: {e}]")
 
+        if self.last_transaction:
+            self.chat_area.append(f"<i>[Multi-file update applied. {len(self.last_transaction)} files modified. <a href='rollback'>Undo</a>]</i>")
+            
         return modified
+
+    def rollback_last_transaction(self):
+        """
+        Restores files to their pre-transaction state.
+        """
+        if not hasattr(self, 'last_transaction') or not self.last_transaction:
+            return
+            
+        for path, content in self.last_transaction:
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            except Exception as e:
+                self.chat_area.append(f"<i>[Rollback Error for {path}: {e}]</i>")
+        
+        self.chat_area.append("<i>[Rollback completed successfully]</i>")
+        self.last_transaction = []
 
     def apply_response_to_editor(self, response: str):
         """

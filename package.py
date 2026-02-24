@@ -18,7 +18,7 @@ def package():
     # Define paths
     main_script = "main.py"
     app_name = "PyCursor"
-    icon_path = os.path.join("assets", "icons", "logo.ico") # Assuming logo.ico exists or uses default
+    icon_path = os.path.join("assets", "icons", "logo.png") # Assuming logo.ico exists or uses default
     
     # Resources to include
     add_data = [

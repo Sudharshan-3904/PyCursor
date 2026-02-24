@@ -9,7 +9,8 @@ import os
 import fnmatch
 import re
 import difflib
-from typing import Optional
+from typing import Optional, List, Dict
+from .rag_service import RAGManager
 
 class ContextManager:
     """
@@ -28,14 +29,20 @@ class ContextManager:
         self.ignore_patterns = [
             "*.pyc", "__pycache__", ".git", ".venv", "env", "node_modules", 
             "*.png", "*.jpg", "*.svg", "*.ico", "*.pdf", "*.zip", "*.bin",
-            "package-lock.json", "yarn.lock"
+            "package-lock.json", "yarn.lock", ".pycursor"
         ]
+        self.rag_enabled = False
+        self.rag_manager = None
+        if project_path:
+            self.rag_manager = RAGManager(project_path)
 
     def set_project_path(self, path: str):
         """
         Updates the target project root for context operations.
         """
         self.project_path = path
+        if path:
+            self.rag_manager = RAGManager(path)
 
     def get_context(self, query: str) -> dict:
         """
@@ -57,7 +64,20 @@ class ContextManager:
                 context_blocks.append(f"File: {rel_path}\n```\n{content}\n```")
                 current_size += len(content)
 
-        # Phase 2: Heuristic Relevance Discovery
+        # Phase 2: Vector Similarity Search (RAG) - Priority 2
+        if self.rag_enabled and self.rag_manager:
+            rag_results = self.rag_manager.search(query)
+            for res in rag_results:
+                rel_path = res["path"]
+                snippet = res["snippet"]
+                if rel_path in used_files: continue
+                
+                if (current_size + len(snippet)) < self.max_context_chars:
+                    used_files.append(rel_path)
+                    context_blocks.append(f"File: {rel_path} (Context Match)\n```\n{snippet}\n```")
+                    current_size += len(snippet)
+
+        # Phase 3: Heuristic Relevance Discovery - Fallback
         relevant_files = self._discover_relevant_files(query)
         for rel_path in relevant_files:
             if rel_path in used_files: continue

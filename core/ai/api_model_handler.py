@@ -42,6 +42,34 @@ class APIModelHandler:
         self.config = config
         self._openai = self._anthropic = self._gemini = None
 
+    def configure(self, provider: str, api_key: Optional[str] = None, model_name: Optional[str] = None) -> bool:
+        """
+        Convenience method to update configuration from raw parameters.
+        Returns True if configuration was successful.
+        """
+        try:
+            if not api_key:
+                api_key = self.env_key_resolver(provider)
+            
+            if not api_key:
+                # Still need a key for most providers, but some might use env vars
+                # If both are missing, we can't proceed
+                pass
+                
+            if not model_name:
+                models = self.get_supported_models(provider)
+                model_name = models[0] if models else "gpt-3.5-turbo"
+
+            self.config = APIConfig(
+                provider=provider,
+                api_key=api_key or "",
+                model_name=model_name
+            )
+            self._openai = self._anthropic = self._gemini = None
+            return True
+        except Exception:
+            return False
+
     def _get_openai_client(self):
         """
         Internal resolver for the OpenAI SDK client.

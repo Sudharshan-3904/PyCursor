@@ -49,7 +49,6 @@ class DiffViewer(QDialog):
         
         # Use system fixed font to ensure a valid monospace font
         self.display_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        self.display_font.setPixelSize(-1)
         self.display_font.setPointSize(10)
         
         # Verify the font is actually resolved correctly
@@ -57,7 +56,6 @@ class DiffViewer(QDialog):
         if font_info.pointSize() <= 0:
             # Fallback to a known font
             self.display_font = QFont("Courier New", 10)
-            self.display_font.setPixelSize(-1)
             self.display_font.setPointSize(10)
         
         # Ensure font size is valid and positive
