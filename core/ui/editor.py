@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtGui import QColor, QFont, QAction, QFontDatabase, QFontInfo
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, QTimer
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython
 from core.ui.theme import COLORS, LIGHT_COLORS
 from core.ui.completion_popup import CompletionPopup
@@ -236,6 +236,38 @@ class CodeEditor(QsciScintilla):
             parent = self._find_main_window()
             if parent and hasattr(parent, 'lsp_manager'):
                 parent.lsp_manager.get_completion(self.file_path, line, col, self._handle_completion)
+
+    def _on_completion_selected(self, item):
+        """
+        Handler called when a completion item is activated in the popup.
+        Inserts the chosen text into the document, replacing any
+        partially-typed word to the left of the cursor.
+        """
+        if item is None:
+            return
+
+        completion_text = item.text()
+        if completion_text:
+            # determine the start of the current word fragment
+            line, col = self.getCursorPosition()
+            try:
+                line_text = self.text(line)
+            except Exception:
+                line_text = ""
+
+            start = col
+            while start > 0 and (line_text[start - 1].isalnum() or line_text[start - 1] == "_"):
+                start -= 1
+
+            if start != col:
+                # select the fragment so that replaceSelectedText will overwrite it
+                self.setSelection(line, start, line, col)
+            # replace selected text (or insert if nothing selected)
+            self.replaceSelectedText(completion_text)
+
+        # hide the popup and return focus to editor
+        self.completion_popup.hide()
+        self.setFocus()
 
     def _handle_completion(self, result):
         """

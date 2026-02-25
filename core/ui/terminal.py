@@ -9,7 +9,15 @@ class Terminal(QTextEdit):
     """
     Integrated shell terminal emulator for executing system commands.
     Combines a QTextEdit for display with a QProcess for persistent shell interaction.
+
+    This simplified implementation **does not append a custom prompt**; instead
+    it allows the underlying shell to render its own prompt.  That avoids the
+    duplicated-directory problem entirely and keeps output identical to a normal
+    terminal session.  The prompt-related logic is retained only for command
+    extraction and backspace protection, which are heuristic and tolerant of
+    whatever the shell chooses to show.
     """
+
     def __init__(self, project_path=None):
         """
         Initializes the terminal and starts the underlying system shell process.
@@ -21,7 +29,7 @@ class Terminal(QTextEdit):
         self.setMinimumHeight(100)
         self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.setUndoRedoEnabled(False)
-        
+
         # Set font to prevent invalid font sizes
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         font.setPointSize(10)
@@ -33,7 +41,7 @@ class Terminal(QTextEdit):
 
         self.project_path = project_path or os.getcwd()
         self.shell = self._detect_shell()
-        
+
         # Configure the persistent shell process
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -61,16 +69,16 @@ class Terminal(QTextEdit):
         if platform.system() == "Windows":
             shell_args = ["-NoExit"] if "powershell" in self.shell.lower() or "pwsh" in self.shell.lower() else ["/K"]
         else:
-            shell_args = ["-i"] # Interactive mode
+            shell_args = ["-i"]  # Interactive mode
 
         self.process.start(self.shell, shell_args)
         if not self.process.waitForStarted(3000):
             self.append("[Terminal] Fatal: Failed to initialize shell process.")
 
-        self.prompt = f"{self.project_path} $ " if os.name != "nt" else f"{self.project_path}> "
+        # placeholder used for legacy code; kept empty
+        self.prompt = ""
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setFocus()
-        self.append(self.prompt)
 
     def __del__(self):
         """
@@ -106,10 +114,15 @@ class Terminal(QTextEdit):
         Asynchronously streams output from the shell process to the terminal display.
         """
         data = self.process.readAllStandardOutput().data().decode("utf-8", errors="ignore")
-        if data:
-            self.moveCursor(QTextCursor.MoveOperation.End)
-            self.insertPlainText(data)
-            self.ensureCursorVisible()
+        if not data:
+            return
+
+        # simply forward everything the shell emits; we no longer try to filter
+        # out startup echoes.  By not appending our own prompt in __init__, we
+        # avoid duplicating whatever the shell prints.
+        self.moveCursor(QTextCursor.MoveOperation.End)
+        self.insertPlainText(data)
+        self.ensureCursorVisible()
 
     def keyPressEvent(self, event):
         """
@@ -123,8 +136,10 @@ class Terminal(QTextEdit):
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             last_line = self.toPlainText().split("\n")[-1]
             cmd = last_line.strip()
-            
-            # Extract actual command text by stripping prompt
+
+            # Extract actual command text by stripping anything up to the last
+            # (typically shell) prompt separator.  This heuristic works with
+            # "path> ", ":~$ ", etc.
             for sep in (">", "$", ":"):
                 idx = cmd.rfind(sep)
                 if idx != -1:
@@ -134,7 +149,6 @@ class Terminal(QTextEdit):
             # Handle internal controls (clear)
             if cmd.lower() in ("cls", "clear"):
                 self.clear()
-                self.append(self.prompt)
                 return
 
             # Submit command to background process
@@ -145,9 +159,11 @@ class Terminal(QTextEdit):
             return
 
         elif event.key() == Qt.Key.Key_Backspace:
-            # Prevent backspacing through the shell prompt
+            # simple backspace protection: don't delete when the current line is
+            # already empty (avoids erasing previous output when cursor is at
+            # start of line)
             line = self.toPlainText().split("\n")[-1]
-            if len(line) <= len(self.prompt):
+            if len(line) <= 0:
                 return
 
         super().keyPressEvent(event)
@@ -158,7 +174,7 @@ class Terminal(QTextEdit):
         """
         if self.process.state() != QProcess.ProcessState.Running:
             return
-        
+
         self.moveCursor(QTextCursor.MoveOperation.End)
         self.append(f"\n--- [Executing: {command}] ---\n")
         self.process.write((command + "\n").encode("utf-8"))
@@ -170,10 +186,9 @@ class Terminal(QTextEdit):
         """
         if not os.path.isdir(new_path):
             return
-        
+
         self.project_path = new_path
-        self.prompt = f"{self.project_path} $ " if os.name != "nt" else f"{self.project_path}> "
-        
+        # we no longer maintain a custom prompt value
         if self.process.state() == QProcess.ProcessState.Running:
             cd_cmd = f"cd \"{new_path}\"" if os.name == "nt" else f"cd '{new_path}'"
             self.execute_command(cd_cmd)

@@ -13,3 +13,6 @@ google-generativeai
 pyflakes
 mypy
 ruff
+faiss-cpu
+sentence-transformers
+torch
