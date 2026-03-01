@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QMenu, QApplication, QWidget, QHBoxLayout, QPushButt
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt
 from core.utilities.utils import load_icon
-from core.ui.theme import COLORS
+from core.ui.theme import THEMES
 from core.ui.keybindings_dialog import KeybindingsDialog
 
 class MenuManager:
@@ -128,8 +128,10 @@ class MenuManager:
         # Appearance Submenu
         appearance = view_menu.addMenu("Appearance")
         theme_menu = appearance.addMenu("Color Theme")
-        theme_menu.addAction("Dark (Mocha)", lambda: self.main_window.apply_theme("dark"))
-        theme_menu.addAction("Light (Latte)", lambda: self.main_window.apply_theme("light"))
+        
+        # Dynamically populate theme menu from the design system's registry
+        for tid, tinfo in THEMES.items():
+            theme_menu.addAction(tinfo['name'], lambda checked, t=tid: self.main_window.apply_theme(t))
 
         view_menu.addSeparator()
         

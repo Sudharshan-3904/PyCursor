@@ -1,0 +1,168 @@
+QMainWindow {
+    background-color: @bg_primary;
+}
+
+QWidget {
+    background-color: @bg_primary;
+    color: @text_primary;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 10pt;
+}
+
+/* Exclude QsciScintilla and QTextEdit from global font settings to prevent conflicts */
+QsciScintilla, QTextEdit {
+    font-family: inherit;
+}
+
+QMenuBar {
+    background-color: @bg_secondary;
+    border-bottom: 1px solid @border;
+    padding: 4px;
+}
+
+QMenuBar::item:selected {
+    background-color: @bg_elevated;
+    border-radius: 4px;
+}
+
+QMenu {
+    background-color: @bg_secondary;
+    border: 1px solid @border_light;
+    padding: 5px;
+}
+
+QMenu::item:selected {
+    background-color: @accent_blue;
+    color: @bg_primary;
+}
+
+QTabWidget::pane {
+    border-top: 1px solid @border;
+}
+
+QTabBar::tab {
+    padding: 8px 16px;
+    background-color: @bg_secondary;
+    color: @text_secondary;
+}
+
+QTabBar::tab:selected {
+    background-color: @bg_primary;
+    color: @accent_blue;
+    border-top: 2px solid @accent_blue;
+}
+
+QDockWidget::title {
+    background-color: @bg_secondary;
+    color: @text_secondary;
+    padding: 8px;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 9pt;
+}
+
+QPushButton {
+    background-color: @button_bg;
+    border: 1px solid @border;
+    border-radius: 4px;
+    padding: 5px 12px;
+}
+
+QPushButton:hover {
+    background-color: @button_hover;
+}
+
+QPushButton#SearchOptionBtn {
+    background-color: transparent;
+    padding: 0;
+    border: 1px solid transparent;
+    color: @text_secondary;
+}
+
+QPushButton#SearchOptionBtn:checked {
+    background-color: @bg_selection;
+    border: 1px solid @accent_blue;
+    color: @accent_blue;
+}
+
+QPushButton#SearchOptionBtn:hover, QPushButton#AIChatControl:hover {
+    background-color: @bg_elevated;
+}
+
+QPushButton#AIChatControl {
+    background-color: @bg_elevated;
+    border: 1px solid @border;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+QPushButton#AIChatControl:checked {
+    background-color: @bg_selection;
+    border: 1px solid @accent_blue;
+}
+
+QLineEdit, QTextEdit {
+    background-color: @bg_tertiary;
+    border: 1px solid @border;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+QTreeView {
+    background-color: @sidebar_bg;
+    border: none;
+}
+
+QTreeView::item:selected {
+    background-color: @bg_selection;
+    border-left: 3px solid @accent_blue;
+}
+
+QScrollBar:vertical {
+    background-color: transparent;
+    width: 12px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: @bg_elevated;
+    border-radius: 6px;
+    margin: 2px;
+}
+
+QStatusBar {
+    background-color: @bg_secondary;
+    border-top: 1px solid @border;
+    min-height: 22px;
+}
+
+QStatusBar::item {
+    border: none;
+}
+
+QStatusBar QLabel, QStatusBar QPushButton {
+    background-color: transparent;
+    color: @text_secondary;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 11px;
+    padding: 0px 12px;
+    border-left: 1px solid @border_light;
+}
+
+QStatusBar QLabel#StatusFirst {
+    border-left: none;
+}
+
+QStatusBar QPushButton {
+    border: none;
+    border-radius: 0;
+    text-align: center;
+}
+
+QStatusBar QPushButton:hover {
+    background-color: @bg_elevated;
+}
+
+QToolBar {
+    background-color: @bg_secondary;
+    border-right: 1px solid @border;
+}

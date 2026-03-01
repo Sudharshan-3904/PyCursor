@@ -25,6 +25,7 @@ class GitPanel(QWidget) :
         super().__init__()
         self.git_handler = GitHandler(repo_path)
         self.repo_path = repo_path
+        self._last_status = None
         self._init_ui()
 
     def _init_ui(self):
@@ -81,7 +82,9 @@ class GitPanel(QWidget) :
         self.branch_combo.currentTextChanged.connect(self.on_branch_changed)
         header.addWidget(self.branch_combo)
         
-        self.refresh_btn = QPushButton("↻")
+        from core.utilities.utils import load_icon
+        self.refresh_btn = QPushButton()
+        self.refresh_btn.setIcon(load_icon("refresh.svg"))
         self.refresh_btn.setFixedSize(28, 28)
         self.refresh_btn.clicked.connect(self.refresh)
         header.addWidget(self.refresh_btn)
@@ -168,10 +171,18 @@ class GitPanel(QWidget) :
         Updates the UI to reflect the current state of the repository.
         """
         self.branch_combo.blockSignals(True)
-        self.branch_combo.clear()
-        self.branch_combo.addItems(branches)
+        # Avoid clear/refill if branches haven't changed
+        branch_list = sorted(branches)
+        if [self.branch_combo.itemText(i) for i in range(self.branch_combo.count())] != branch_list:
+            self.branch_combo.clear()
+            self.branch_combo.addItems(branch_list)
         if current: self.branch_combo.setCurrentText(current)
         self.branch_combo.blockSignals(False)
+        
+        # Only rebuild tree if status changed
+        if self._last_status == status:
+            return
+        self._last_status = status
         
         self.changes_tree.clear()
         staged_grp = QTreeWidgetItem(self.changes_tree, ["Staged Changes"])

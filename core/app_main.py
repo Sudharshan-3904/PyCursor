@@ -14,7 +14,7 @@ from core.ui.editor import CodeEditor
 from core.ui.terminal import Terminal
 from core.ai.ai_engine import AIEngine
 from core.utilities.utils import load_icon
-from core.ui.theme import get_stylesheet, COLORS
+from core.ui.theme import get_stylesheet, THEMES
 from core.utilities.keybindings import KeyBindingsManager
 from core.git.git_panel import GitPanel
 from core.git.git_handler import GitHandler
@@ -189,7 +189,22 @@ class PyCursorMain(QMainWindow):
     def apply_theme(self, theme_name):
         """
         Updates the application stylesheet, icons, and refreshes all open editor instances.
+        Debounced to prevent redundant refreshes when rapid changes occur.
         """
+        if not hasattr(self, '_theme_timer'):
+            self._theme_timer = QTimer(self)
+            self._theme_timer.setSingleShot(True)
+            self._theme_timer.timeout.connect(self._do_apply_theme)
+        
+        self._pending_theme = theme_name
+        self._theme_timer.start(150) # 150ms debounce
+
+    def _do_apply_theme(self):
+        """
+        Internal implementation of theme application.
+        """
+        theme_name = getattr(self, '_pending_theme', 'dark')
+        from core.ui.theme import get_stylesheet
         self.setStyleSheet(get_stylesheet(theme=theme_name))
         self.refresh_icons(theme_name)
         
@@ -341,45 +356,40 @@ class PyCursorMain(QMainWindow):
         """
         Manages sidebar visibility and stack switching based on activity bar interaction.
         """
-        sidebar_actions = {
-            "explorer": self.explorer_action,
-            "search": self.search_action,
-            "git": self.git_action,
-            "logs": self.logs_action,
-            "extensions": self.extensions_action,
-            "debug": self.debug_action,
+        sidebar_config = {
+            "explorer": {"action": self.explorer_action, "index": 0, "title": "EXPLORER"},
+            "git": {"action": self.git_action, "index": 1, "title": "SOURCE CONTROL"},
+            "logs": {"action": self.logs_action, "index": 2, "title": "APP LOGS"},
+            "extensions": {"action": self.extensions_action, "index": 3, "title": "EXTENSIONS"},
+            "search": {"action": self.search_action, "index": 4, "title": "SEARCH"},
+            "debug": {"action": self.debug_action, "index": 5, "title": "DEBUG"},
         }
         
-        if view_name in sidebar_actions:
-            target_action = sidebar_actions[view_name]
-            
-            if target_action.isChecked():
-                # If clicking the already active view, hide sidebar
-                was_active = False
-                if self.sidebar_dock.isVisible():
-                    idx_map = {"explorer": 0, "git": 1, "logs": 2, "extensions": 3, "search": 4}
-                    if self.sidebar_stack.currentIndex() == idx_map.get(view_name):
-                        was_active = True
-                
-                if was_active:
-                    self.sidebar_dock.setVisible(False)
-                    target_action.setChecked(False)
-                else:
-                    # Switch stack and ensure sidebar is visible
-                    for name, act in sidebar_actions.items():
-                        if name != view_name: act.setChecked(False)
-                    
-                    self.sidebar_dock.setVisible(True)
-                    idx_map = {"explorer": 0, "git": 1, "logs": 2, "extensions": 3, "search": 4, "debug": 5}
-                    title_map = {"explorer": "EXPLORER", "git": "SOURCE CONTROL", "logs": "APP LOGS", "extensions": "EXTENSIONS", "search": "SEARCH", "debug": "DEBUG"}
-                    
-                    self.sidebar_stack.setCurrentIndex(idx_map[view_name])
-                    self.sidebar_dock.setWindowTitle(title_map[view_name])
-                    
-                    if view_name == "git": self.git_panel.refresh()
-                    if view_name == "search" and self.project_path: self.search_panel.set_project_path(self.project_path)
-            else:
+        if view_name not in sidebar_config: return
+        
+        target = sidebar_config[view_name]
+        action = target["action"]
+        
+        if action.isChecked():
+            # If sidebar is already visible and showing this view, toggle it off
+            if self.sidebar_dock.isVisible() and self.sidebar_stack.currentIndex() == target["index"]:
                 self.sidebar_dock.setVisible(False)
+                action.setChecked(False)
+            else:
+                # Uncheck others
+                for name, cfg in sidebar_config.items():
+                    if name != view_name: cfg["action"].setChecked(False)
+                
+                # Show sidebar and switch to targeted view
+                self.sidebar_dock.setVisible(True)
+                self.sidebar_stack.setCurrentIndex(target["index"])
+                self.sidebar_dock.setWindowTitle(target["title"])
+                
+                # Trigger lazy refreshes
+                if view_name == "git": self.git_panel.refresh()
+                if view_name == "search" and self.project_path: self.search_panel.set_project_path(self.project_path)
+        else:
+            self.sidebar_dock.setVisible(False)
 
     def create_status_bar(self):
         """

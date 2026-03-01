@@ -26,16 +26,6 @@ class SideBar(QWidget):
         self.root_path = root_path or os.getcwd()
         self.creating_item = None
         self.filter_mode = False
-
-        # Placeholder for AI models configuration
-        self.models = {
-            "LM Studio": ["lm1", "lm2"],
-            "Ollama": ["granite", "ruby"],
-            "API": ["ChatGPT Go"]
-        }
-        self.current_model_name = "lm1"
-        self.current_backend = "lmstudio"
-
         self._init_ui()
 
     def _init_ui(self):
@@ -123,9 +113,12 @@ class SideBar(QWidget):
     def refresh_tree(self):
         """
         Synchronizes the view with the current file system state.
+        Ensures the root index is correctly set.
         """
         root_index = self.model.index(self.root_path)
-        self.tree.setRootIndex(self.proxy_model.mapFromSource(root_index))
+        proxy_root = self.proxy_model.mapFromSource(root_index)
+        if self.tree.rootIndex() != proxy_root:
+            self.tree.setRootIndex(proxy_root)
 
     def set_root_path(self, path: str):
         """
@@ -181,10 +174,15 @@ class SideBar(QWidget):
 
     def on_item_clicked(self, index: QModelIndex):
         """
-        Emits selection signal when a file (non-directory) is clicked.
+        Emits selection signal for files; toggles expansion for directories.
         """
         source_index = self.proxy_model.mapToSource(index)
-        if not self.model.isDir(source_index):
+        if self.model.isDir(source_index):
+            if self.tree.isExpanded(index):
+                self.tree.collapse(index)
+            else:
+                self.tree.expand(index)
+        else:
             self.file_selected.emit(self.model.filePath(source_index))
 
     def create_item(self, is_folder=False):

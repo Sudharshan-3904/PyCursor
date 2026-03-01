@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtGui import QColor, QFont, QAction, QFontDatabase, QFontInfo
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, QTimer
 from PyQt6.Qsci import QsciScintilla, QsciLexerPython
 from core.ui.theme import COLORS, LIGHT_COLORS
 from core.ui.completion_popup import CompletionPopup
@@ -43,6 +43,7 @@ class CodeEditor(QsciScintilla):
         # IntelliSense Components
         self.completion_popup = CompletionPopup(self)
         self.completion_popup.list_widget.itemActivated.connect(self._on_completion_selected)
+        self.completion_popup.list_widget.itemClicked.connect(self._on_completion_selected)
         
         # Ensure font is properly set after all initialization
         self._ensure_font_valid()
@@ -104,13 +105,17 @@ class CodeEditor(QsciScintilla):
         # Use the font that was already set
         self._ensure_font_valid()
 
-        # Ghost Text (Inline Copilot)
+        # Ghost Text (Inline Copilot) Settings
         self.ghost_text = ""
+        self.ghost_interval = 500 # Default 500ms idle trigger
         self.ghost_timer = QTimer(self)
         self.ghost_timer.setSingleShot(True)
-        self.ghost_timer.setInterval(500) # 500ms idle trigger
+        self.ghost_timer.setInterval(self.ghost_interval)
         self.ghost_timer.timeout.connect(self._trigger_ghost_text)
         self.textChanged.connect(lambda: self.ghost_timer.start())
+        
+        # State Caching
+        self._cached_main_window = None
         
         # Indicator for gray text
         self.INDICATOR_GHOST = 8
@@ -137,14 +142,16 @@ class CodeEditor(QsciScintilla):
 
     def append_text(self, text: str):
         """
-        Appends text to the end of the document, ensuring proper newline handling.
+        Appends text to the end of the document with O(1) efficiency.
         """
         text = text.replace("\r\n", "\n")
-        existing_text = self.text()
-        if existing_text and not existing_text.endswith("\n"):
-            self.setText(existing_text + "\n" + text)
-        else:
-            self.setText(existing_text + text)
+        
+        # Ensure we start on a new line if document isn't empty and doesn't end with one
+        last_line = self.lines() - 1
+        if self.lineLength(last_line) > 0:
+            self.append("\n")
+            
+        self.append(text)
             
     def contextMenuEvent(self, event):
         """
@@ -254,9 +261,13 @@ class CodeEditor(QsciScintilla):
         """
         Converts cursor line/col to relative pixel coordinates for popup placement.
         """
-        line, col = self.getCursorPosition()
-        # simplified for Phase 2
-        return self.cursorRect().bottomLeft()
+        # Get raw Scintilla position
+        pos = self.SendScintilla(2008) # SCI_GETCURRENTPOS
+        x = self.SendScintilla(2164, 0, pos) # SCI_POINTXFROMPOS
+        y = self.SendScintilla(2165, 0, pos) # SCI_POINTYFROMPOS
+        
+        from PyQt6.QtCore import QPoint
+        return QPoint(x, y)
 
     def _trigger_ghost_text(self):
         """
@@ -283,8 +294,34 @@ class CodeEditor(QsciScintilla):
         line, col = self.getCursorPosition()
         self.fill_ghost_text(line, col, suggestion)
 
+    def _on_completion_selected(self, item):
+        """
+        Inserts the selected completion item into the editor.
+        """
+        self.completion_popup.hide()
+        if not item: return
+        
+        # Get the word currently being typed
+        line, col = self.getCursorPosition()
+        current_line = self.text(line)
+        
+        # Simple back-search for word start (alphanumeric or underscore)
+        start_col = col
+        while start_col > 0 and (current_line[start_col-1].isalnum() or current_line[start_col-1] == '_'):
+            start_col -= 1
+            
+        # Replace the word fragment with selection
+        self.setSelection(line, start_col, line, col)
+        self.replaceSelectedText(item.text())
+        self.setFocus()
+
     def fill_ghost_text(self, line, col, text):
-        # Implementation to show ghost text using indicators
+        """
+        Renders ghost text at the specified position.
+        """
+        # For now, we use the indicator to highlight the end of the current word
+        # with ghost-like appearance if possible, or just a placeholder.
+        # Proper ghost text requires a custom lexer or multi-line indicators.
         pass
 
     def _handle_definition(self, result):
@@ -340,11 +377,15 @@ class CodeEditor(QsciScintilla):
 
     def _find_main_window(self):
         """
-        Walks up the widget tree to find the main application window.
+        Walks up the widget tree to find the main application window and caches the result.
         """
+        if self._cached_main_window:
+            return self._cached_main_window
+            
         pw = self.parent()
         while pw:
             if hasattr(pw, 'ai_widget') or hasattr(pw, 'lsp_manager'):
+                self._cached_main_window = pw
                 return pw
             pw = pw.parent()
         return None

@@ -111,14 +111,41 @@ class RAGManager:
 
     def index_project(self):
         """
-        Walks the project and indexes all supported files.
+        Walks the project and indexes all supported files in parallel threads.
         """
         from core.ai.context_manager import ContextManager
-        cm = ContextManager(self.project_path) # Use its ignore logic
+        from concurrent.futures import ThreadPoolExecutor
+        
+        cm = ContextManager(self.project_path)
         files = cm._list_project_files()
         
-        for rel_path in files:
+        def process_file(rel_path):
             abs_path = os.path.join(self.project_path, rel_path)
             content = cm._read_safe(abs_path)
             if content:
-                self.add_documents(abs_path, content)
+                # Prepare entries but don't add to index yet (index isn't thread-safe for adding)
+                rel_p = rel_path.replace("\\", "/")
+                lines = content.splitlines()
+                chunk_size = 30 # Increased chunk size for better context
+                entries = []
+                for i in range(0, len(lines), chunk_size):
+                    snippet = "\n".join(lines[i:i+chunk_size])
+                    if snippet.strip():
+                        entries.append({
+                            "path": rel_p,
+                            "snippet": snippet,
+                            "line_start": i + 1
+                        })
+                return entries
+            return []
+
+        all_new_entries = []
+        with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            results = list(executor.map(process_file, files))
+            for res in results:
+                all_new_entries.extend(res)
+
+        if all_new_entries:
+            # Batch add to index for efficiency
+            self.metadata = all_new_entries
+            self._rebuild_index()

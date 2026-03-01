@@ -29,13 +29,19 @@ class AIEngine(QWidget):
         self.setWindowTitle("AI Assistant")
         self.resize(600, 800)
 
-        # Asset Initialization
-        self.send_icon = load_icon("send.png")
-        self.local_icon = load_icon("local.png")
-        self.api_icon = load_icon("api.png")
-        self.model_icon = load_icon("model.png")
-        self.agent_icon = load_icon("agent.svg")
-        self.brain_icon = load_icon("brain.svg")
+        # Asset Initialization & Caching
+        self._icon_cache = {}
+        self.send_icon = self._get_cached_icon("send.png")
+        self.local_icon = self._get_cached_icon("local.png")
+        self.api_icon = self._get_cached_icon("api.png")
+        self.model_icon = self._get_cached_icon("model.png")
+        self.agent_icon = self._get_cached_icon("agent.svg")
+        self.brain_icon = self._get_cached_icon("brain.svg")
+
+        # Pre-compiled Regex Patterns
+        self._re_read = re.compile(r'<read_file>(.*?)</read_file>', re.DOTALL)
+        self._re_write = re.compile(r'<write_file path="(.*?)">(.*?)</write_file>', re.DOTALL)
+        self._re_edit = re.compile(r'<<<edit>>>(.*?)<<</edit>>>', re.DOTALL)
 
         # Backend Handlers
         self.local_model_handler = LocalModelHandler()
@@ -45,8 +51,12 @@ class AIEngine(QWidget):
         self.context_manager = ContextManager()
 
         # State Management
-        self.models = {}
-        self.current_model_name = None
+        self.models = {
+            "LM Studio": ["lm1", "lm2"],
+            "Ollama": ["granite", "ruby"],
+            "API": ["ChatGPT Go"]
+        }
+        self.current_model_name = "lm1"
         self.current_backend = "ollama"
         self.api_config = None
         self.using_api = False
@@ -152,14 +162,23 @@ class AIEngine(QWidget):
         from core.ui.theme import get_icon_color
         color = get_icon_color(theme_name)
         
-        self.send_btn.setIcon(load_icon("send.png", color=color))
-        self.model_btn.setIcon(load_icon("model.png", color=color))
-        self.agent_mode_btn.setIcon(load_icon("agent.svg", color=color))
-        self.brain_mode_btn.setIcon(load_icon("brain.svg", color=color))
+        self.send_btn.setIcon(self._get_cached_icon("send.png", color=color))
+        self.model_btn.setIcon(self._get_cached_icon("model.png", color=color))
+        self.agent_mode_btn.setIcon(self._get_cached_icon("agent.svg", color=color))
+        self.brain_mode_btn.setIcon(self._get_cached_icon("brain.svg", color=color))
         
         # Source Toggle Icon
         source_icon = "local.png" if not self.using_api else "api.png"
-        self.api_local_btn.setIcon(load_icon(source_icon, color=color))
+        self.api_local_btn.setIcon(self._get_cached_icon(source_icon, color=color))
+
+    def _get_cached_icon(self, name, color=None):
+        """
+        Retrieves an icon from the internal cache or loads it if missing.
+        """
+        cache_key = (name, color.name() if color else None)
+        if cache_key not in self._icon_cache:
+            self._icon_cache[cache_key] = load_icon(name, color=color)
+        return self._icon_cache[cache_key]
 
     def update_models(self, models: dict):
         """
@@ -191,17 +210,24 @@ class AIEngine(QWidget):
 
     def on_model_change(self, selected_model):
         """
-        Updates the active model backend and target identifier.
+        Updates the active model backend and target identifier with robust parsing.
         """
-        if selected_model.startswith("Ollama:"):
-            backend, identifier = "ollama", selected_model.split(": ", 1)[-1]
-        elif selected_model.startswith("LM Studio:"):
-            backend, identifier = "lmstudio", selected_model.split(": ", 1)[-1]
-        else:
-            backend, identifier = "api", selected_model
+        backend = "api"
+        identifier = selected_model
+        
+        if ": " in selected_model:
+            parts = selected_model.split(": ", 1)
+            prefix = parts[0].lower()
+            if "ollama" in prefix:
+                backend = "ollama"
+            elif "lm studio" in prefix:
+                backend = "lmstudio"
+            identifier = parts[1]
 
         self.local_model_handler.backend = backend
         self.local_model_handler.model_name = identifier
+        self.current_model_name = identifier
+        self.current_backend = backend
 
     def toggle_api_local(self):
         """
@@ -298,8 +324,7 @@ class AIEngine(QWidget):
         self.last_transaction = [] # List of (path, original_content)
         
         # Handle read_file
-        read_pattern = r'<read_file>(.*?)</read_file>'
-        for match in re.finditer(read_pattern, response):
+        for match in self._re_read.finditer(response):
             path = match.group(1).strip()
             try:
                 full_path = os.path.join(getattr(self.main_window, 'project_path', '.'), path)
@@ -310,8 +335,7 @@ class AIEngine(QWidget):
                 modified = modified.replace(match.group(0), f"[Read Error: {e}]")
 
         # Handle write_file (Transaction-aware)
-        write_pattern = r'<write_file path="(.*?)">(.*?)</write_file>'
-        for match in re.finditer(write_pattern, response, re.DOTALL):
+        for match in self._re_write.finditer(response):
             path, content = match.group(1).strip(), match.group(2).strip()
             try:
                 full_path = os.path.join(getattr(self.main_window, 'project_path', '.'), path)
@@ -354,19 +378,23 @@ class AIEngine(QWidget):
         """
         Extracts code from edit tags and injects it into the active editor buffer.
         """
-        match = re.search(r'<<<edit>>>(.*?)<<</edit>>>', response, re.DOTALL)
+        match = self._re_edit.search(response)
         extracted = match.group(1).strip() if match else response.strip()
 
         editor = getattr(self.main_window, 'editor_manager', None).get_current_editor() if hasattr(self, 'main_window') else None
         if editor:
-            current = editor.text()
-            new_code = (current + "\n" + extracted) if current and not current.endswith("\n") else (current + extracted)
-            editor.setText(new_code)
+            # Use append_text if the response is just supplementary, or setText if it is meant to replace
+            # For <<<edit>>> tags, we'll append to the end for now.
+            if hasattr(editor, 'append_text'):
+                editor.append_text(extracted)
+            else:
+                current = editor.text()
+                new_code = (current + "\n" + extracted) if current and not current.endswith("\n") else (current + extracted)
+                editor.setText(new_code)
             
             # Auto-save changes
-            path = getattr(editor, 'file_path', None)
-            if path:
-                with open(path, "w", encoding="utf-8") as f: f.write(new_code)
+            if hasattr(self.main_window, 'editor_manager'):
+                self.main_window.editor_manager.save_current_file()
 
     def _handle_ai_error(self, error):
         self.chat_area.append(f"<span style='color:red'>AI Error: {error}</span>")

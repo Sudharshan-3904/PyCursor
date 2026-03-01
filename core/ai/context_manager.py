@@ -33,16 +33,24 @@ class ContextManager:
         ]
         self.rag_enabled = False
         self.rag_manager = None
+        self._files_cache = None
+        self._cache_timestamp = 0
+        
         if project_path:
-            self.rag_manager = RAGManager(project_path)
+            self.set_project_path(project_path)
 
     def set_project_path(self, path: str):
         """
         Updates the target project root for context operations.
         """
-        self.project_path = path
-        if path:
+        if not path: return
+        path = os.path.normpath(path)
+        
+        if self.project_path != path or self.rag_manager is None:
+            self.project_path = path
             self.rag_manager = RAGManager(path)
+            self._files_cache = None # Invalidate cache on path change
+            self._cache_timestamp = 0
 
     def get_context(self, query: str) -> dict:
         """
@@ -149,17 +157,26 @@ class ContextManager:
 
     def _list_project_files(self) -> list:
         """
-        Internal utility for recursive project traversal with exclusion handling.
+        Internal utility for recursive project traversal with manifest caching.
         """
+        import time
+        now = time.time()
+        
+        # Cache for 10 seconds to balance accuracy and performance
+        if self._files_cache is not None and (now - self._cache_timestamp) < 10:
+            return self._files_cache
+            
         manifest = []
         for root, dirs, files in os.walk(self.project_path):
-            # Prune directory tree based on ignore rules
             dirs[:] = [d for d in dirs if not self._is_pattern_ignored(d)]
             
             for f in files:
                 if not self._is_pattern_ignored(f):
                     rel = os.path.relpath(os.path.join(root, f), self.project_path)
-                    manifest.append(rel.replace("\\", "/"))
+                    manifest.append(os.path.normpath(rel).replace("\\", "/"))
+        
+        self._files_cache = manifest
+        self._cache_timestamp = now
         return manifest
 
     def _is_pattern_ignored(self, name: str) -> bool:

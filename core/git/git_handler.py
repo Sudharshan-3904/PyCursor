@@ -38,26 +38,31 @@ class GitHandler:
     
     def __init__(self, repo_path: Optional[str] = None):
         """
-        Initializes the handler and attempts to open a repository if a path is provided.
+        Initializes the handler with caching support.
         """
         self.repo_path = repo_path
         self.repo = None
+        self._status_cache = None
+        self._cache_timestamp = 0
+        self._cache_ttl = 3.0 # Cache status for 3 seconds
         
         if repo_path:
             self.open_repository(repo_path)
     
     def open_repository(self, path: str) -> bool:
         """
-        Attempts to bind to an existing Git repository at the specified path.
+        Attempts to bind to an existing Git repository with robust handle management.
         """
         try:
             import git
+            if self.repo:
+                self.repo.close()
             self.repo = git.Repo(path, search_parent_directories=True)
             self.repo_path = self.repo.working_dir
             return True
         except Exception:
             return False
-    
+
     def is_repository(self, path: str) -> bool:
         """
         Validates if a directory is part of a Git repository.
@@ -80,40 +85,40 @@ class GitHandler:
             return True
         except Exception:
             return False
-    
-    def get_status(self) -> List[GitFileStatus]:
+
+    def get_status(self, force_refresh: bool = False) -> List[GitFileStatus]:
         """
-        Retrieves a comprehensive list of all changed, staged, and untracked files.
+        Retrieves Git status with time-based caching to prevent UI stutter.
         """
         if not self.repo:
             return []
         
+        import time
+        now = time.time()
+        if not force_refresh and self._status_cache is not None and (now - self._cache_timestamp) < self._cache_ttl:
+            return self._status_cache
+        
         files = []
-        
-        # Parse Index/HEAD differences (Staged)
-        for item in self.repo.index.diff("HEAD"):
-            files.append(GitFileStatus(
-                path=item.a_path,
-                status=item.change_type.lower(),
-                staged=True
-            ))
-        
-        # Parse Working-Tree/Index differences (Changed)
-        for item in self.repo.index.diff(None):
-            files.append(GitFileStatus(
-                path=item.a_path,
-                status=item.change_type.lower(),
-                staged=False
-            ))
-        
-        # Include new files not yet tracked
-        for file in self.repo.untracked_files:
-            files.append(GitFileStatus(
-                path=file,
-                status='untracked',
-                staged=False
-            ))
-        
+        try:
+            # Parse Index/HEAD differences (Staged)
+            # Use diff with 'HEAD' to see staged changes
+            try:
+                for item in self.repo.index.diff("HEAD"):
+                    files.append(GitFileStatus(path=item.a_path, status=item.change_type.lower(), staged=True))
+            except Exception: pass # Likely no commits yet
+
+            # Parse Working-Tree/Index differences (Unstaged)
+            for item in self.repo.index.diff(None):
+                files.append(GitFileStatus(path=item.a_path, status=item.change_type.lower(), staged=False))
+            
+            # Untracked files
+            for file in self.repo.untracked_files:
+                files.append(GitFileStatus(path=file, status='untracked', staged=False))
+        except Exception as e:
+            print(f"[Git Error] Failed to get status: {e}")
+
+        self._status_cache = files
+        self._cache_timestamp = now
         return files
     
     def stage_file(self, file_path: str) -> bool:

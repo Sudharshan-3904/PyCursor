@@ -12,19 +12,46 @@ from PyQt6.QtWidgets import (
     QCheckBox, QScrollArea, QSizePolicy
 )
 
-try:
-    import openai
-    _HAS_OPENAI = True
-except Exception:
-    _HAS_OPENAI = False
+from .api_model_handler import APIModelHandler, APIConfig
 
+class LLMClient:
+    """
+    Standardized client for LLM interactions within the AI Module.
+    Wraps APIModelHandler to provide high-level methods for code editing and Q&A.
+    """
+    def __init__(self, config: dict):
+        self.handler = APIModelHandler()
+        provider = config.get("provider", "openai")
+        self.handler.configure(provider=provider)
 
-def on_suggestion_ready(result: dict):
+    def request_code_edit(self, filename: str, full_code: str, instruction: str) -> dict:
+        prompt = f"File: {filename}\n\nCode:\n```python\n{full_code}\n```\n\nInstruction: {instruction}\n\nRespond with a JSON object: {{'modified_code': '...', 'explanation': '...'}}"
+        response = self.handler.generate_response(prompt)
+        # Simple JSON extraction logic (could be more robust)
+        try:
+            import json
+            # Find JSON block in response
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+        except Exception:
+            pass
+        return {"modified_code": response, "explanation": "Direct response applied."}
+
+    def answer_question(self, filename: str, full_code: str, question: str) -> dict:
+        prompt = f"File: {filename}\n\nCode:\n```python\n{full_code}\n```\n\nQuestion: {question}"
+        response = self.handler.generate_response(prompt)
+        return {"answer": response}
+
+def on_suggestion_ready(window, result: dict):
+    """
+    Callback for AI suggestions. Now accepts the parent window as an argument.
+    """
     modified = result.get("modified_code", "")
     explanation = result.get("explanation", "")
-    original = window.editor.toPlainText()
+    original = get_editor_full_text_generic(window.editor_tabs.currentWidget())
 
-    if not modified.strip():
+    if not modified.strip() or modified == "{}":
         QMessageBox.warning(window, "Empty AI Response", "The AI returned no code.")
         return
 
@@ -33,8 +60,11 @@ def on_suggestion_ready(result: dict):
         return
 
     try:
-        set_editor_full_text_generic(window.editor, modified)
-        window.statusBar().showMessage("AI applied full edit", 3000)
+        dialog = AISuggestionDialog(window, original, modified, explanation)
+        if dialog.exec():
+            # Apply changes (full replacement for now if hunks aren't used)
+            set_editor_full_text_generic(window.editor_tabs.currentWidget(), modified)
+            window.statusBar().showMessage("AI suggestion applied", 3000)
     except Exception as e:
         QMessageBox.critical(window, "AI Apply Error", str(e))
 
@@ -59,8 +89,9 @@ class _LLMWorker(QThread):
                 result = self.llm_client.answer_question(self.filename, self.full_code, self.payload)
             else:
                 raise RuntimeError(f"Unknown worker mode: {self.mode}")
+            
             if not isinstance(result, dict):
-                raise RuntimeError("LLM did not return a dict.")
+                raise RuntimeError("LLM did not return a valid dictionary.")
             self.finished_with_result.emit(result)
         except Exception as e:
             self.failed.emit(str(e))

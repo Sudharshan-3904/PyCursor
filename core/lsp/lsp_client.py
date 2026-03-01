@@ -31,12 +31,15 @@ class LSPClient(QObject):
         self.request_id = 1
         self.callbacks = {}
         self.is_running = False
+        self.send_queue = None
 
     def start(self) -> bool:
         """
         Launches the LSP server process and starts the asynchronous read loops.
         """
         try:
+            import queue
+            self.send_queue = queue.Queue()
             self.process = subprocess.Popen(
                 self.server_command,
                 stdin=subprocess.PIPE,
@@ -46,9 +49,10 @@ class LSPClient(QObject):
             )
             self.is_running = True
             
-            # Start background threads for monitoring STDOUT and STDERR
-            threading.Thread(target=self._read_loop, daemon=True).start()
-            threading.Thread(target=self._error_loop, daemon=True).start()
+            # Start background threads for I/O orchestration
+            threading.Thread(target=self._read_loop, daemon=True, name="LSP-Read").start()
+            threading.Thread(target=self._write_loop, daemon=True, name="LSP-Write").start()
+            threading.Thread(target=self._error_loop, daemon=True, name="LSP-Error").start()
             return True
         except Exception as e:
             print(f"LSP Process Error: {e}")
@@ -92,17 +96,31 @@ class LSPClient(QObject):
 
     def _send(self, data: dict):
         """
-        Internal utility to frame and write JSON-RPC messages to the process STDIN.
+        Enqueues a message for the background write thread.
         """
-        if not self.process or not self.process.stdin: return
-        
-        body = json.dumps(data)
-        content = f"Content-Length: {len(body)}\r\n\r\n{body}"
-        try:
-            self.process.stdin.write(content.encode("utf-8"))
-            self.process.stdin.flush()
-        except Exception:
-            pass
+        if self.send_queue:
+            self.send_queue.put(data)
+
+    def _write_loop(self):
+        """
+        Consumes the write queue and pushes data to STDIN.
+        """
+        while self.is_running:
+            try:
+                import queue
+                data = self.send_queue.get(timeout=0.5)
+                if not self.process or not self.process.stdin: continue
+                
+                body = json.dumps(data)
+                content = f"Content-Length: {len(body)}\r\n\r\n{body}"
+                self.process.stdin.write(content.encode("utf-8"))
+                self.process.stdin.flush()
+                self.send_queue.task_done()
+            except (queue.Empty, BrokenPipeError, AttributeError):
+                continue
+            except Exception as e:
+                print(f"LSP Write Error: {e}")
+                break
 
     def _read_loop(self):
         """
@@ -185,6 +203,28 @@ class LSPManager(QObject):
         """
         self.initialized = True
         self.client.send_notification("initialized", {})
+        
+        # Start health check timer
+        self.health_timer = threading.Timer(10.0, self.check_health)
+        self.health_timer.daemon = True
+        self.health_timer.start()
+
+    def check_health(self):
+        """
+        Periodic check to ensure the server process is alive.
+        Restarts the server if it has terminated unexpectedly.
+        """
+        if not self.client.is_running: return
+        
+        if self.client.process and self.client.process.poll() is not None:
+            print("[LSP] Server process lost. Restarting...")
+            self.initialized = False
+            self.start()
+        else:
+            # Reschedule next check
+            self.health_timer = threading.Timer(10.0, self.check_health)
+            self.health_timer.daemon = True
+            self.health_timer.start()
 
     def get_definition(self, file_path, line, col, callback):
         """

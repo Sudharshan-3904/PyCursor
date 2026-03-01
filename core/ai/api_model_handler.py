@@ -37,12 +37,12 @@ class APIModelHandler:
         
     def set_config(self, config: APIConfig):
         """
-        Applies a new configuration and resets active client handles.
+        Standardizes on a single configuration injection point and resets active client handles.
         """
         self.config = config
         self._openai = self._anthropic = self._gemini = None
 
-    def configure(self, provider: str, api_key: Optional[str] = None, model_name: Optional[str] = None) -> bool:
+    def configure(self, provider: str, api_key: Optional[str] = None, model_name: Optional[str] = None, **kwargs) -> bool:
         """
         Convenience method to update configuration from raw parameters.
         Returns True if configuration was successful.
@@ -51,23 +51,20 @@ class APIModelHandler:
             if not api_key:
                 api_key = self.env_key_resolver(provider)
             
-            if not api_key:
-                # Still need a key for most providers, but some might use env vars
-                # If both are missing, we can't proceed
-                pass
-                
             if not model_name:
                 models = self.get_supported_models(provider)
-                model_name = models[0] if models else "gpt-3.5-turbo"
+                model_name = models[0] if models else "gpt-4o"
 
-            self.config = APIConfig(
+            new_config = APIConfig(
                 provider=provider,
                 api_key=api_key or "",
-                model_name=model_name
+                model_name=model_name,
+                **kwargs
             )
-            self._openai = self._anthropic = self._gemini = None
+            self.set_config(new_config)
             return True
-        except Exception:
+        except Exception as e:
+            print(f"[API Error] Configuration failed: {e}")
             return False
 
     def _get_openai_client(self):
@@ -101,10 +98,14 @@ class APIModelHandler:
     def generate_response(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """
         Main entry point for generating static (non-streaming) completions.
-        Dispatches the request to the appropriate sub-handler based on the active provider.
+        Standardizes system prompt retrieval from assets if not provided.
         """
         if not self.config: raise ValueError("API Config not initialized.")
         
+        if system_prompt is None:
+            from core.utilities.utils import load_systemPrompt
+            system_prompt = load_systemPrompt("generalPrompt.txt")
+            
         provider = self.config.provider.lower()
         if provider == 'openai': return self._openai_request(prompt, system_prompt)
         if provider == 'anthropic': return self._anthropic_request(prompt, system_prompt)

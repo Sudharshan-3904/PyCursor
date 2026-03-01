@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QFormLayout, QCheckBox
 )
 from PyQt6.QtCore import Qt
-from core.ui.theme import COLORS
+from core.ui.theme import COLORS, THEMES
 from core.ai.api_model_handler import APIModelHandler, APIConfig
 
 class SettingsDialog(QDialog):
@@ -104,7 +104,7 @@ class SettingsDialog(QDialog):
         general_tab.setLayout(gen_layout)
         
         self.theme_combo = QComboBox()
-        self.theme_combo.addItems(["dark", "light"])
+        self.theme_combo.addItems(list(THEMES.keys()))
         self.theme_combo.setCurrentText(self.parent()._settings.get("theme", "dark"))
         gen_layout.addRow("Theme:", self.theme_combo)
         

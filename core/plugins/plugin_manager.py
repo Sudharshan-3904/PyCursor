@@ -33,19 +33,28 @@ class PluginManager(QObject):
 
     def discover_plugins(self) -> list:
         """
-        Scans the plugin root for subdirectory-based packages containing a valid plugin.json.
+        Scans the plugin root for subdirectory-based packages containing a valid plugin.json in parallel.
         """
-        manifests = []
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def check_plugin(item):
+            path = os.path.join(self.plugins_dir, item)
+            manifest_path = os.path.join(path, "plugin.json")
+            if os.path.isdir(path) and os.path.exists(manifest_path):
+                try:
+                    with open(manifest_path, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+                except Exception:
+                    return None
+            return None
+
         try:
-            for item in os.listdir(self.plugins_dir):
-                path = os.path.join(self.plugins_dir, item)
-                manifest = os.path.join(path, "plugin.json")
-                if os.path.isdir(path) and os.path.exists(manifest):
-                    with open(manifest, 'r', encoding='utf-8') as f:
-                        manifests.append(json.load(f))
-        except (IOError, json.JSONDecodeError):
-            pass
-        return manifests
+            items = os.listdir(self.plugins_dir)
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                results = list(executor.map(check_plugin, items))
+            return [r for r in results if r is not None]
+        except Exception:
+            return []
 
     def load_plugin(self, folder_name: str) -> tuple:
         """

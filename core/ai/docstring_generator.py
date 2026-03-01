@@ -52,34 +52,24 @@ class DocstringGenerator:
     
     def analyze_code(self, code: str) -> Dict:
         """
-        Analyze Python code to extract functions and classes
-        
-        Args:
-            code: Python source code to analyze
-            
-        Returns:
-            Dictionary containing functions and classes info
+        Analyzes Python code to extract top-level functions and classes efficiently.
         """
         try:
             tree = ast.parse(code)
         except SyntaxError as e:
-            return {'error': f'Syntax error in code: {e}', 'functions': [], 'classes': []}
+            return {'error': f'Syntax error: {e}', 'functions': [], 'classes': []}
         
         functions = []
         classes = []
         
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
-                func_info = self._extract_function_info(node)
-                functions.append(func_info)
+        # Only analyze top-level nodes for better performance and structural clarity
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                functions.append(self._extract_function_info(node))
             elif isinstance(node, ast.ClassDef):
-                class_info = self._extract_class_info(node)
-                classes.append(class_info)
+                classes.append(self._extract_class_info(node))
         
-        return {
-            'functions': functions,
-            'classes': classes
-        }
+        return {'functions': functions, 'classes': classes}
     
     def _extract_function_info(self, node) -> FunctionInfo:
         """Extract information from a function AST node"""
@@ -128,23 +118,16 @@ class DocstringGenerator:
     
     def generate_function_docstring(self, func_info: FunctionInfo, code_context: str = "") -> str:
         """
-        Generate docstring for a function
-        
-        Args:
-            func_info: Function information
-            code_context: Optional code context for better understanding
-            
-        Returns:
-            Generated docstring
+        Generates a docstring for a function or method using the configured style.
         """
-        if self.style == 'google':
-            return self._generate_google_function_docstring(func_info)
-        elif self.style == 'numpy':
-            return self._generate_numpy_function_docstring(func_info)
-        elif self.style == 'sphinx':
-            return self._generate_sphinx_function_docstring(func_info)
-        else:\
-            return self._generate_pep257_function_docstring(func_info)
+        handlers = {
+            'google': self._generate_google_function_docstring,
+            'numpy': self._generate_numpy_function_docstring,
+            'sphinx': self._generate_sphinx_function_docstring,
+            'pep257': self._generate_pep257_function_docstring
+        }
+        handler = handlers.get(self.style, self._generate_google_function_docstring)
+        return handler(func_info)
     
     def _generate_google_function_docstring(self, func_info: FunctionInfo) -> str:
         """Generate Google-style docstring"""

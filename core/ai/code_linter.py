@@ -37,25 +37,28 @@ class LintError:
 
 class CodeLinter:
     """Comprehensive code linter with multiple tool support"""
+    _AVAILABLE_TOOLS_CACHE = None
     
     def __init__(self):
-        self.available_tools = self._detect_available_tools()
+        if CodeLinter._AVAILABLE_TOOLS_CACHE is None:
+            CodeLinter._AVAILABLE_TOOLS_CACHE = self._detect_available_tools()
+        self.available_tools = CodeLinter._AVAILABLE_TOOLS_CACHE
+
+    def _parse_lint_line(self, line: str, pattern: str) -> Optional[tuple]:
+        """Shared regex parsing logic to reduce duplication across tool handlers."""
+        match = re.match(pattern, line)
+        return match.groups() if match else None
     
     def _detect_available_tools(self) -> Dict[str, bool]:
-        """Detect which linting tools are available"""
+        """Detect which linting tools are available in the system environment."""
         tools = {}
-        
         for tool in ['pyflakes', 'mypy', 'ruff', 'pylint', 'flake8']:
             try:
-                result = subprocess.run(
-                    [tool, '--version'],
-                    capture_output=True,
-                    timeout=2
-                )
+                # Optimized check: only verify presence, don't wait for full version output if not needed
+                result = subprocess.run([tool, '--version'], capture_output=True, timeout=1.5)
                 tools[tool] = result.returncode == 0
-            except (FileNotFoundError, subprocess.TimeoutExpired):
+            except (FileNotFoundError, subprocess.SubprocessError, Exception):
                 tools[tool] = False
-        
         return tools
     
     def lint_file(self, file_path: str, tools: Optional[List[str]] = None, python_exec: str = None) -> List[LintError]:
@@ -131,13 +134,11 @@ class CodeLinter:
                 timeout=10
             )
             
-            errors = []
             pattern = r'^(.+?):(\d+):(\d+)?\s*(.+)$'
-            
             for line in result.stdout.splitlines():
-                match = re.match(pattern, line)
-                if match:
-                    filepath, line_num, col, message = match.groups()
+                matches = self._parse_lint_line(line, pattern)
+                if matches:
+                    filepath, line_num, col, message = matches
                     errors.append(LintError(
                         file_path=filepath,
                         line=int(line_num),
@@ -147,7 +148,6 @@ class CodeLinter:
                         message=message.strip(),
                         tool='pyflakes'
                     ))
-            
             return errors
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return []
@@ -166,20 +166,12 @@ class CodeLinter:
                 timeout=15
             )
             
-            errors = []
             pattern = r'^(.+?):(\d+):(\d+):\s*(error|warning|note):\s*(.+?)(?:\s+\[(.+?)\])?$'
-            
             for line in result.stdout.splitlines():
-                match = re.match(pattern, line)
-                if match:
-                    filepath, line_num, col, severity, message, code = match.groups()
-                    
-                    severity_map = {
-                        'error': Severity.ERROR,
-                        'warning': Severity.WARNING,
-                        'note': Severity.INFO
-                    }
-                    
+                matches = self._parse_lint_line(line, pattern)
+                if matches:
+                    filepath, line_num, col, severity, message, code = matches
+                    severity_map = {'error': Severity.ERROR, 'warning': Severity.WARNING, 'note': Severity.INFO}
                     errors.append(LintError(
                         file_path=filepath,
                         line=int(line_num),
@@ -189,7 +181,6 @@ class CodeLinter:
                         message=message.strip(),
                         tool='mypy'
                     ))
-            
             return errors
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return []
@@ -208,23 +199,15 @@ class CodeLinter:
                 timeout=10
             )
             
-            errors = []
             pattern = r'^(.+?):(\d+):(\d+):\s*([A-Z]\d+)\s+(.+)$'
-            
             for line in result.stdout.splitlines():
-                match = re.match(pattern, line)
-                if match:
-                    filepath, line_num, col, code, message = match.groups()
+                matches = self._parse_lint_line(line, pattern)
+                if matches:
+                    filepath, line_num, col, code, message = matches
                     errors.append(LintError(
-                        file_path=filepath,
-                        line=int(line_num),
-                        column=int(col),
-                        severity=Severity.WARNING,
-                        code=code,
-                        message=message.strip(),
-                        tool='ruff'
+                        file_path=filepath, line=int(line_num), column=int(col),
+                        severity=Severity.WARNING, code=code, message=message.strip(), tool='ruff'
                     ))
-            
             return errors
         except (FileNotFoundError, subprocess.TimeoutExpired):
             return []
