@@ -469,39 +469,86 @@ class CodeEditor(QsciScintilla):
         self.setFont(font)
         self.setMarginsFont(font)
 
-    def apply_theme_colors(self, theme='dark'):
+    def apply_theme_colors(self, theme=None):
         """
-        Applies a comprehensive color palette based on the chosen theme (dark/light).
-        Configures paper colors, caret, selection, and syntax highlighting.
+        Applies a comprehensive color palette. 
+        If theme name is not provided, uses the global COLORS palette from theme module.
         """
-        theme_colors = COLORS if theme == 'dark' else LIGHT_COLORS
+        from core.ui.theme import THEMES, COLORS
+        
+        if theme and theme in THEMES:
+            theme_colors = THEMES[theme]['palette']
+        else:
+            # Fallback to the globally active palette
+            theme_colors = COLORS
+        
         bg = QColor(theme_colors['editor_bg'])
         fg = QColor(theme_colors['text_primary'])
         
+        # Explicitly set the widget background
+        self.setStyleSheet(f"background-color: {theme_colors['editor_bg']}; color: {theme_colors['text_primary']}; border: none;")
         self.setPaper(bg)
+        
         if self.lexer():
+            # Reset all styles to common font/bg first
+            self.lexer().setDefaultPaper(bg)
             self.lexer().setPaper(bg)
             self.lexer().setDefaultColor(fg)
             
-            # Syntax highlighting adjustments
-            if theme == 'light':
-                self.lexer().setColor(QColor("#0000ff"), QsciLexerPython.Keyword)
-                self.lexer().setColor(QColor("#a31515"), QsciLexerPython.SingleQuotedString)
-                self.lexer().setColor(QColor("#008000"), QsciLexerPython.Comment)
-            else:
-                self.lexer().setColor(QColor("#569cd6"), QsciLexerPython.Keyword)
-                self.lexer().setColor(QColor("#ce9178"), QsciLexerPython.SingleQuotedString)
-                self.lexer().setColor(QColor("#6a9955"), QsciLexerPython.Comment)
+            for style in range(128):
+                self.lexer().setFont(self.font(), style)
+                self.lexer().setPaper(bg, style)
+            
+            # Setup Keyword Differentiation (Set 0: Decl, Set 1: Control)
+            decl_keywords = "def class lambda"
+            control_keywords = ("if for in return while break continue try except finally "
+                               "else elif with as yield pass import from global nonlocal "
+                               "assert del and or not is")
+            
+            self.lexer().setKeywords(decl_keywords, 0)
+            self.lexer().setKeywords(control_keywords, 1)
 
-        self.setMarginsBackgroundColor(bg)
-        self.setMarginsForegroundColor(QColor(theme_colors['text_secondary']))
-        self.setFolding(QsciScintilla.FoldStyle.BoxedTreeFoldStyle)
-        self.setFoldMarginColors(bg, bg)
+            # Syntax highlighting mapping from theme tokens - Applied LAST to ensure they stick
+            self.lexer().setColor(QColor(theme_colors.get('syntax_keyword', '#5DA9FF')), QsciLexerPython.Keyword)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_control', '#F43F5E')), QsciLexerPython.KeywordSet2)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_string', '#F43F5E')), QsciLexerPython.SingleQuotedString)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_string', '#F43F5E')), QsciLexerPython.DoubleQuotedString)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_string', '#F43F5E')), QsciLexerPython.TripleQuotedString)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_string', '#F43F5E')), QsciLexerPython.TripleDoubleQuotedString)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_comment', '#4ADE80')), QsciLexerPython.Comment)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_function', '#FACC15')), QsciLexerPython.FunctionMethodName)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_class', '#4ADE80')), QsciLexerPython.ClassName)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_number', '#A78BFA')), QsciLexerPython.Number)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_operator', '#FFFFFF')), QsciLexerPython.Operator)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_variable', '#E6EAF2')), QsciLexerPython.Identifier)
+            self.lexer().setColor(QColor(theme_colors.get('syntax_decorator', '#FACC15')), QsciLexerPython.Decorator)
         
         self.setCaretForegroundColor(QColor(theme_colors['editor_cursor']))
         self.setSelectionBackgroundColor(QColor(theme_colors['editor_selection']))
-        self.setSelectionForegroundColor(QColor(theme_colors['text_highlight']))
+        # Use a null color for foreground to preserve syntax highlighting in selections
+        self.setSelectionForegroundColor(QColor())
         self.setEdgeColor(QColor(theme_colors['bg_tertiary']))
+            
+
+        # Margins & Gutter
+        self.setMarginsBackgroundColor(bg)
+        self.setMarginsForegroundColor(QColor(theme_colors['text_secondary']))
+        
+        # Folding setup
+        fold_fg = QColor(theme_colors.get('editor_fold_fg', theme_colors['text_secondary']))
+        fold_bg = QColor(theme_colors.get('editor_fold_bg', theme_colors['editor_bg']))
+        
+        self.setFolding(QsciScintilla.FoldStyle.BoxedTreeFoldStyle)
+        self.setFoldMarginColors(fold_bg, fold_bg)
+        
+        # Style the fold markers (the icons used for collapse/expand)
+        # Markers 25-31 are standard folder markers in Scintilla
+        for marker in range(25, 32):
+            self.setMarkerBackgroundColor(fold_bg, marker)
+            self.setMarkerForegroundColor(fold_fg, marker)
+        
+        # SCI_COLOURISE = 2028. Force re-calculation of all syntax styles
+        self.SendScintilla(2028, 0, -1)
 
     def refresh_theme(self, theme_name):
         """

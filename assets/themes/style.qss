@@ -9,9 +9,10 @@ QWidget {
     font-size: 10pt;
 }
 
-/* Exclude QsciScintilla and QTextEdit from global font settings to prevent conflicts */
+/* Ensure QsciScintilla and QTextEdit use themed editor colors */
 QsciScintilla, QTextEdit {
-    font-family: inherit;
+    background-color: @editor_bg;
+    color: @text_primary;
 }
 
 QMenuBar {

@@ -61,6 +61,11 @@ class EditorManager:
         editor = CodeEditor()
         editor.file_path = file_path
         
+        # Apply the current theme immediately
+        if hasattr(self.main_window, '_settings'):
+            current_theme = self.main_window._settings.get("theme", "dark")
+            editor.apply_theme_colors(current_theme)
+        
         # Connect editor-specific signals to main window handlers
         if hasattr(self.main_window, 'git_panel'):
             editor.git_blame_requested.connect(self.main_window.git_panel.show_blame)

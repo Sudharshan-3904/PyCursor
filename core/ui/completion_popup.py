@@ -1,35 +1,15 @@
 from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QFrame, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QColor
-from core.ui.theme import COLORS
+from core.ui.theme import get_color
 
 class CompletionPopup(QFrame):
     """
     A custom, themed popup for IntelliSense completion suggestions.
     """
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme='dark'):
         super().__init__(parent, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLORS['bg_secondary']};
-                border: 1px solid {COLORS['border']};
-                border-radius: 4px;
-            }}
-            QListWidget {{
-                background-color: transparent;
-                border: none;
-                outline: none;
-            }}
-            QListWidget::item {{
-                padding: 4px 8px;
-                color: {COLORS['text_secondary']};
-            }}
-            QListWidget::item:selected {{
-                background-color: {COLORS['bg_selection']};
-                color: {COLORS['accent_blue']};
-            }}
-        """)
+        self.set_theme(theme)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(1, 1, 1, 1)
@@ -40,6 +20,35 @@ class CompletionPopup(QFrame):
         layout.addWidget(self.list_widget)
         
         self.setFixedSize(250, 200)
+
+    def set_theme(self, theme):
+        bg_secondary = get_color('bg_secondary', theme)
+        border = get_color('border', theme)
+        bg_selection = get_color('bg_selection', theme)
+        accent_blue = get_color('accent_blue', theme)
+        text_secondary = get_color('text_secondary', theme)
+
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_secondary};
+                border: 1px solid {border};
+                border-radius: 4px;
+            }}
+            QListWidget {{
+                background-color: transparent;
+                border: none;
+                outline: none;
+            }}
+            QListWidget::item {{
+                padding: 4px 8px;
+                color: {text_secondary};
+            }}
+            QListWidget::item:selected {{
+                background-color: {bg_selection};
+                color: {accent_blue};
+            }}
+        """)
 
     def set_items(self, items: list):
         """

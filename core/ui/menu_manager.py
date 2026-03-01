@@ -122,7 +122,7 @@ class MenuManager:
         views = [("Explorer", "explorer"), ("Search", "search"), ("Source Control", "git"), ("Extensions", "extensions"), ("Output", "logs")]
         for label, vid in views:
             act = QAction(label, self.main_window)
-            act.triggered.connect(lambda checked, v=vid: self.main_window.toggle_view(v))
+            act.triggered.connect(lambda checked=False, v=vid: self.main_window.toggle_view(v))
             open_view.addAction(act)
 
         # Appearance Submenu
@@ -131,7 +131,7 @@ class MenuManager:
         
         # Dynamically populate theme menu from the design system's registry
         for tid, tinfo in THEMES.items():
-            theme_menu.addAction(tinfo['name'], lambda checked, t=tid: self.main_window.apply_theme(t))
+            theme_menu.addAction(tinfo['name'], lambda checked=False, t=tid: self.main_window.apply_theme(t))
 
         view_menu.addSeparator()
         

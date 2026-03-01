@@ -6,50 +6,66 @@ Standardizes UI components using Catppuccin-inspired Mocha (Dark) and Latte (Lig
 
 # Dark Theme Palette (Mocha)
 MOCHA_DARK_COLORS = {
-    'bg_primary': '#1e1e2e',      # Main background
-    'bg_secondary': '#181825',    # Secondary surfaces (Sidebar/Terminal)
-    'bg_tertiary': '#11111b',     # Deep backgrounds (Title/Crust)
-    'bg_elevated': '#313244',     # Surface level components
-    'bg_selection': '#45475a',    # Selection highlights
-    'bg_input': '#11111b',        # Input field base
+    'bg_primary': '#1e1e1e',      # VS Code Background
+    'bg_secondary': '#252526',    # VS Code Sidebar
+    'bg_tertiary': '#181818',     # VS Code Terminal
+    'bg_elevated': '#3c3c3c',     # Surface level components
+    'bg_selection': '#264f78',    # VS Code Selection
+    'bg_input': '#3c3c3c',        
     
-    'text_primary': '#cdd6f4',    # Primary text
-    'text_secondary': '#a6adc8',  # Muted descriptive text
-    'text_tertiary': '#6c7086',   # Tertiary/Subtle text
-    'text_disabled': '#6c7086',   # Disabled state text
-    'text_highlight': '#ffffff',  # Over-active text
+    'text_primary': '#d4d4d4',    # VS Code Foreground
+    'text_secondary': '#a6adc8',  
+    'text_tertiary': '#6c7086',   
+    'text_disabled': '#6c7086',   
+    'text_highlight': '#ffffff',  
     
-    'accent_blue': '#89b4fa',     # Action blue
-    'accent_purple': '#cba6f7',   # AI features mauve
-    'accent_green': '#a6e3a1',    # Success green
-    'accent_orange': '#fab387',   # Warning peach
-    'accent_red': '#f38ba8',      # Error red
-    'accent_yellow': '#f9e2af',   # Information yellow
+    'accent_blue': '#007acc',     # VS Code Blue
+    'accent_purple': '#c586c0',   # VS Code Purple/Mauve
+    'accent_green': '#6a9955',    
+    'accent_orange': '#ce9178',   
+    'accent_red': '#f44747',      
+    'accent_yellow': '#dcdcaa',   
     
-    'border': '#313244',          # Component borders
-    'border_light': '#45475a',    # Subtle contrast borders
-    'border_focus': '#89b4fa',    # Active focus state
+    'border': '#3c3c3c',          
+    'border_light': '#45475a',    
+    'border_focus': '#007acc',    
     
-    'button_bg': '#313244',
+    'button_bg': '#3c3c3c',
     'button_hover': '#45475a',
-    'button_pressed': '#1e1e2e',
-    'button_active': '#1e1e2e',
+    'button_pressed': '#1e1e1e',
+    'button_active': '#1e1e1e',
     
-    'tab_active_bg': '#1e1e2e',
-    'tab_inactive_bg': '#181825',
-    'tab_hover_bg': '#1e1e2e',
+    'tab_active_bg': '#1e1e1e',
+    'tab_inactive_bg': '#2d2d2d',
+    'tab_hover_bg': '#1e1e1e',
     
-    'statusbar_bg': '#89b4fa',    
-    'statusbar_text': '#1e1e2e',
+    'statusbar_bg': '#007acc',    
+    'statusbar_text': '#ffffff',
     
-    'editor_bg': '#1e1e2e',
-    'editor_line_bg': '#181825',
-    'editor_selection': '#45475a',
-    'editor_cursor': '#f5e0dc',   
+    'editor_bg': '#1e1e1e',
+    'editor_line_bg': '#2a2d2e',
+    'editor_selection': '#264f78',
+    'editor_cursor': '#aeafad',
+    'editor_fold_fg': '#d4d4d4',
+    'editor_fold_bg': '#1e1e1e',
     
-    'sidebar_bg': '#181825',
-    'sidebar_hover': '#313244',
-    'sidebar_selected': '#45475a',
+    'sidebar_bg': '#252526',
+    'sidebar_hover': '#2a2d2e',
+    'sidebar_selected': '#37373d',
+    'list_hover': '#2a2d2e',
+    'accent_blue_hover': '#0098ff',
+    'text_dim': '#6c7086',
+
+    'syntax_keyword': '#569cd6',
+    'syntax_string': '#ce9178',
+    'syntax_function': '#dcdcaa',
+    'syntax_class': '#4ec9b0',
+    'syntax_variable': '#9cdcfe',
+    'syntax_comment': '#6a9955',
+    'syntax_number': '#b5cea8',
+    'syntax_operator': '#d4d4d4',
+    'syntax_decorator': '#dcdcaa',
+    'syntax_builtin': '#c586c0',
 }
 
 # Light Theme Palette (Latte)
@@ -98,6 +114,20 @@ LIGHT_COLORS = {
     'sidebar_bg': '#e6e9ef',
     'sidebar_hover': '#ccd0da',
     'sidebar_selected': '#acb0be',
+    'list_hover': '#ccd0da',
+    'accent_blue_hover': '#179299',
+    'text_dim': '#9ca0b0',
+
+    'syntax_keyword': '#0000ff',
+    'syntax_string': '#a31515',
+    'syntax_function': '#795e26',
+    'syntax_class': '#267f99',
+    'syntax_variable': '#001080',
+    'syntax_comment': '#008000',
+    'syntax_number': '#098658',
+    'syntax_operator': '#000000',
+    'syntax_decorator': '#795e26',
+    'syntax_builtin': '#af00db',
 }
 
 # Dark Theme Palette (Lexor Nova Dark)
@@ -155,6 +185,21 @@ LEXOR_NOVA_DARK_COLORS = {
     'sidebar_bg': '#1B1F2A',
     'sidebar_hover': '#232838',
     'sidebar_selected': '#2C3347',
+    'list_hover': '#232838',
+    'accent_blue_hover': '#3B82F6',
+    'text_dim': '#6E7891',
+
+    # --- Syntax Highlighting (Matching Screenshot) ---
+    'syntax_keyword': '#5DA9FF',   # Sky Blue
+    'syntax_string': '#F43F5E',    # Vibrant Rose
+    'syntax_function': '#FACC15',  # Bright Yellow
+    'syntax_class': '#4ADE80',     # Emerald Green
+    'syntax_variable': '#E6EAF2',  # Slate White
+    'syntax_comment': '#4ADE80',   # Green (as per screenshot)
+    'syntax_number': '#A78BFA',    # Lavender Purple
+    'syntax_operator': '#FFFFFF',  # Pure White
+    'syntax_decorator': '#FACC15',
+    'syntax_builtin': '#FACC15',   # Yellow (print, etc)
 }
 
 # Light Theme Palette (Lexor Nova Light)
@@ -212,6 +257,21 @@ LEXOR_NOVA_LIGHT_COLORS = {
     'sidebar_bg': '#EEF2F8',
     'sidebar_hover': '#E4E9F2',
     'sidebar_selected': '#DCE4F5',
+    'list_hover': '#E4E9F2',
+    'accent_blue_hover': '#1E40AF',
+    'text_dim': '#9AA3B2',
+
+    # --- Syntax Highlighting ---
+    'syntax_keyword': '#2563EB',
+    'syntax_string': '#DC2626',
+    'syntax_function': '#D97706',
+    'syntax_class': '#16A34A',
+    'syntax_variable': '#1F2937',
+    'syntax_comment': '#9AA3B2',
+    'syntax_number': '#7C3AED',
+    'syntax_operator': '#000000',
+    'syntax_decorator': '#D97706',
+    'syntax_builtin': '#7C3AED',
 }
 
 # Midnight Navy Theme (Lexor Abyss)
@@ -269,6 +329,21 @@ LEXOR_ABYSS_COLORS = {
     'sidebar_bg': '#0F172A',
     'sidebar_hover': '#162033',
     'sidebar_selected': '#1E293B',
+    'list_hover': '#162033',
+    'accent_blue_hover': '#2563EB',
+    'text_dim': '#64748B',
+
+    # --- Syntax Highlighting ---
+    'syntax_keyword': '#3B82F6',
+    'syntax_string': '#EF4444',
+    'syntax_function': '#EAB308',
+    'syntax_class': '#22C55E',
+    'syntax_variable': '#E2E8F0',
+    'syntax_comment': '#64748B',
+    'syntax_number': '#8B5CF6',
+    'syntax_operator': '#FFFFFF',
+    'syntax_decorator': '#EAB308',
+    'syntax_builtin': '#8B5CF6',
 }
 
 # Cyberpunk Theme (Lexor Neon Grid)
@@ -326,6 +401,21 @@ LEXOR_NEON_GRID_COLORS = {
     'sidebar_bg': '#11111A',
     'sidebar_hover': '#1A1A26',
     'sidebar_selected': '#222233',
+    'list_hover': '#1A1A26',
+    'accent_blue_hover': '#00B8D4',
+    'text_dim': '#6B7280',
+
+    # --- Syntax Highlighting ---
+    'syntax_keyword': '#00E5FF',
+    'syntax_string': '#FF0055',
+    'syntax_function': '#FFE600',
+    'syntax_class': '#00FF9F',
+    'syntax_variable': '#E5E7EB',
+    'syntax_comment': '#6B7280',
+    'syntax_number': '#FF00FF',
+    'syntax_operator': '#FFFFFF',
+    'syntax_decorator': '#FFE600',
+    'syntax_builtin': '#FF00FF',
 }
 
 # Nord-Inspired Minimal Theme (Lexor Arctic)
@@ -383,6 +473,86 @@ LEXOR_ARCTIC_COLORS = {
     'sidebar_bg': '#3B4252',
     'sidebar_hover': '#434C5E',
     'sidebar_selected': '#4C566A',
+    'list_hover': '#434C5E',
+    'accent_blue_hover': '#5E81AC',
+    'text_dim': '#A3AFC2',
+
+    # --- Syntax Highlighting ---
+    'syntax_keyword': '#81A1C1',
+    'syntax_string': '#BF616A',
+    'syntax_function': '#EBCB8B',
+    'syntax_class': '#A3BE8C',
+    'syntax_variable': '#ECEFF4',
+    'syntax_comment': '#4C566A',
+    'syntax_number': '#B48EAD',
+    'syntax_operator': '#D8DEE9',
+    'syntax_decorator': '#EBCB8B',
+    'syntax_builtin': '#B48EAD',
+}
+
+# Hack The Box Theme Palette
+HACKTHEBOX_COLORS = {
+    'bg_primary': '#141d2b',      # HTB Deep Slate
+    'bg_secondary': '#111927',    # HTB Darker Slate
+    'bg_tertiary': '#0d121b',     # HTB Deepest
+    'bg_elevated': '#1a2332',     
+    'bg_selection': '#313f55',    
+    'bg_input': '#111927',        
+    
+    'text_primary': '#a4b1cd',    # HTB Light Slate
+    'text_secondary': '#6e7b96',  
+    'text_tertiary': '#313f55',   
+    'text_disabled': '#313f55',   
+    'text_highlight': '#ffffff',  
+    
+    'accent_blue': '#9fef00',     # HTB Neon Green (Primary)
+    'accent_purple': '#cf8dfb',   # HTB Purple
+    'accent_green': '#9fef00',    
+    'accent_orange': '#ffaf00',   
+    'accent_red': '#ff3e3e',      
+    'accent_yellow': '#ffcc5c',   
+    
+    'border': '#1a2332',          
+    'border_light': '#313f55',    
+    'border_focus': '#9fef00',    
+    
+    'button_bg': '#1a2332',
+    'button_hover': '#313f55',
+    'button_pressed': '#141d2b',
+    'button_active': '#141d2b',
+    
+    'tab_active_bg': '#141d2b',
+    'tab_inactive_bg': '#111927',
+    'tab_hover_bg': '#141d2b',
+    
+    'statusbar_bg': '#141d2b',    
+    'statusbar_text': '#9fef00',
+    
+    'editor_bg': '#141d2b',
+    'editor_line_bg': '#1a2332',
+    'editor_selection': '#4a5b78',
+    'editor_cursor': '#9fef00',
+    'editor_fold_fg': '#a4b1cd',
+    'editor_fold_bg': '#141d2b',
+    
+    'sidebar_bg': '#141d2b',
+    'sidebar_hover': '#1a2332',
+    'sidebar_selected': '#1a2332',
+    'list_hover': '#1a2332',
+    'accent_blue_hover': '#c5f467',
+    'text_dim': '#6e7b96',
+
+    # --- Syntax Highlighting (HackTheBox Style) ---
+    'syntax_keyword': '#5DA9FF',  # Blue (Matches HTB VS Code)
+    'syntax_string': '#9FEF00',   # HTB Neon Green
+    'syntax_function': '#FACC15', # Yellow
+    'syntax_class': '#9FEF00',    # Neon Green
+    'syntax_variable': '#A4B1CD', # Slate
+    'syntax_comment': '#4ADE80',  # Green
+    'syntax_number': '#A78BFA',   # Purple
+    'syntax_operator': '#5CECC6', # Teal
+    'syntax_decorator': '#FACC15',
+    'syntax_builtin': '#FACC15',
 }
 
 # Theme Registry
@@ -394,10 +564,11 @@ THEMES = {
     'lexor_abyss': {'name': 'Lexor Abyss', 'palette': LEXOR_ABYSS_COLORS},
     'lexor_neon_grid': {'name': 'Lexor Neon Grid', 'palette': LEXOR_NEON_GRID_COLORS},
     'lexor_arctic': {'name': 'Lexor Arctic', 'palette': LEXOR_ARCTIC_COLORS},
+    'hackthebox': {'name': 'Hack The Box', 'palette': HACKTHEBOX_COLORS},
 }
 
 # Backward compatibility aliases
-COLORS = MOCHA_DARK_COLORS
+COLORS = MOCHA_DARK_COLORS.copy()
 
 def get_color(color_name, theme='dark'):
     """
@@ -423,7 +594,14 @@ def get_stylesheet(theme='dark'):
     Generates the comprehensive application-wide Qt Stylesheet (QSS).
     Loads the template from style.qss and performs tag substitution using the theme palette.
     """
-    global _STYLESHEET_CACHE
+    theme_info = THEMES.get(theme, THEMES['dark'])
+    theme_colors = theme_info['palette']
+    
+    # Always update global COLORS alias so editors and popups get new palette instantly
+    global COLORS
+    COLORS.clear()
+    COLORS.update(theme_colors)
+
     if theme in _STYLESHEET_CACHE:
         return _STYLESHEET_CACHE[theme]
 
@@ -434,10 +612,8 @@ def get_stylesheet(theme='dark'):
         with open(template_path, 'r', encoding='utf-8') as f:
             qss = f.read()
             
-        theme_info = THEMES.get(theme, THEMES['dark'])
-        theme_colors = theme_info['palette']
-        
-        for key, value in theme_colors.items():
+        for key in sorted(theme_colors.keys(), key=len, reverse=True):
+            value = theme_colors[key]
             qss = qss.replace(f"@{key}", value)
             
         _STYLESHEET_CACHE[theme] = qss

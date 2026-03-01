@@ -204,6 +204,7 @@ class PyCursorMain(QMainWindow):
         Internal implementation of theme application.
         """
         theme_name = getattr(self, '_pending_theme', 'dark')
+        print(f"[Theme] Applying theme: {theme_name}")
         from core.ui.theme import get_stylesheet
         self.setStyleSheet(get_stylesheet(theme=theme_name))
         self.refresh_icons(theme_name)
